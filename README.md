@@ -115,16 +115,3 @@ PORT=3000
 NODE_ENV=development
 ```
 
-## Deployment
-
-The application is ready for deployment on:
-- **Frontend**: Vercel, Netlify, AWS S3 + CloudFront
-- **Backend**: Railway, Render, AWS EC2, or any Node.js hosting
-- **Full-Stack**: Railway, Render (supports monorepos)
-
-## Architecture Notes
-
-- **Separation of Concerns**: Clean separation between frontend and backend
-- **Type Safety**: Shared TypeScript types between frontend and backend
-- **Modern Development**: Hot reload, TypeScript, ESM modules
-- **Production Ready**: Optimized builds, error handling, graceful shutdown
