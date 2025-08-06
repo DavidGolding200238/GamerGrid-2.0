@@ -1,17 +1,20 @@
 import { Game } from "../../../shared/api";
 import { useState } from "react";
 
+// Props interface for type safety
 interface GameCardProps {
-  game?: Game; // Make game optional for API loading states
+  game?: Game; // Optional for loading states
   featured?: boolean;
   className?: string;
 }
 
+// GameCard Component - Individual game display card
 export function GameCard({ game, featured = false, className = "" }: GameCardProps) {
+  // State for image loading and error handling
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
-  // Define dimensions - smaller cards with proper proportions
+  // Responsive card dimensions based on featured status
   const cardClass = featured
     ? "w-full max-w-[280px] lg:max-w-[320px] h-[480px] lg:h-[580px]"
     : "w-full max-w-[240px] lg:max-w-[280px] h-[420px] lg:h-[520px]";
@@ -27,7 +30,7 @@ export function GameCard({ game, featured = false, className = "" }: GameCardPro
   // If no game data, show placeholder
   if (!game) {
     return (
-      <div className={`${cardClass} ${className} animate-pulse bg-game-grid-card rounded-[10px] overflow-hidden shadow-[0_4px_9.2px_0_rgba(0,0,0,0.25)]`}>
+      <div className={`${cardClass} ${className} animate-pulse bg-game-grid-card rounded-[10px] overflow-hidden shadow-[0_4px_9.2px_0_rgba(0,0,0,0.25)] border border-white/10 backdrop-blur-sm relative z-30`}>
         <div className={`${imageClass} w-full relative overflow-hidden bg-muted`}>
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-white/30">
@@ -52,7 +55,7 @@ export function GameCard({ game, featured = false, className = "" }: GameCardPro
   const { title, image, genres } = game;
 
   return (
-    <div className={`${cardClass} ${className} bg-game-grid-card rounded-[10px] overflow-hidden shadow-[0_4px_9.2px_0_rgba(0,0,0,0.25)]`}>
+    <div className={`${cardClass} ${className} bg-game-grid-card rounded-[10px] overflow-hidden shadow-[0_4px_9.2px_0_rgba(0,0,0,0.25)] border border-white/10 backdrop-blur-sm relative z-30`}>
       {/* Game Image */}
       <div
         className={`${imageClass} w-full relative overflow-hidden bg-muted`}

@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { authService } from "../services/authService";
 
+// Sign Up Page Component - User Registration Form
 export default function SignUp() {
+  // Form state management
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -13,6 +15,7 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Handle input field changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
@@ -20,6 +23,7 @@ export default function SignUp() {
     });
   };
 
+  // Handle form submission and user registration
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -27,6 +31,7 @@ export default function SignUp() {
 
     try {
       console.log('Starting registration process...');
+      // Call backend API to create new user account
       await authService.register({
         username: formData.username,
         email: formData.email,

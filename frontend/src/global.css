@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Jost:wght@400;700&family=Montserrat:wght@400;700&family=Inter:wght@400;500;600&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css?family=Roboto:100");
 
 @tailwind base;
 @tailwind components;
@@ -136,4 +137,95 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* Animated Background Styles */
+.animated-bg-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(135deg, hsl(220, 15%, 12%) 0%, hsl(230, 20%, 8%) 50%, hsl(240, 25%, 5%) 100%);
+}
+
+.light {
+  position: absolute;
+  width: 2px;
+  height: 120px;
+  opacity: 0.9;
+  background-color: hsl(var(--accent));
+  box-shadow: 
+    hsl(var(--accent) / 0.8) 0px 0px 20px 3px,
+    hsl(var(--accent) / 0.6) 0px 0px 40px 6px;
+  filter: blur(0.3px);
+  opacity: 0;
+  top: 100vh;
+  bottom: 0px;
+  left: 0px;
+  right: 0px;
+  margin: auto;
+}
+
+.x1 {
+  animation: floatUp 4s infinite linear;
+  transform: scale(0.5);
+}
+
+.x2 {
+  animation: floatUp 7s infinite linear;
+  transform: scale(0.8);
+  left: 15%;
+}
+
+.x3 {
+  animation: floatUp 2.5s infinite linear;
+  transform: scale(0.3);
+  left: -15%;
+}
+
+.x4 {
+  animation: floatUp 4.5s infinite linear;
+  transform: scale(0.6);
+  left: -34%;
+}
+
+.x5 {
+  animation: floatUp 8s infinite linear;
+  transform: scale(1.0);
+  left: -57%;
+}
+
+.x6 {
+  animation: floatUp 3s infinite linear;
+  transform: scale(0.4);
+  left: -81%;
+}
+
+.x7 {
+  animation: floatUp 5.3s infinite linear;
+  transform: scale(1.2);
+  left: 37%;
+}
+
+.x8 {
+  animation: floatUp 4.7s infinite linear;
+  transform: scale(0.7);
+  left: 62%;
+}
+
+.x9 {
+  animation: floatUp 4.1s infinite linear;
+  transform: scale(0.5);
+  left: 85%;
+}
+
+@keyframes floatUp {
+  0% { top: 100vh; opacity: 0; }
+  25% { opacity: 1; }
+  50% { top: 0vh; opacity: 0.8; }
+  75% { opacity: 1; }
+  100% { top: -100vh; opacity: 0; }
 }

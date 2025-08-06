@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { GameCard } from "./GameCard";
 import { Game } from "../../../shared/api";
 
+// Component props interface for type safety
 interface GameRowProps {
   games: Game[];
   title: string;
@@ -9,20 +10,23 @@ interface GameRowProps {
   loading?: boolean;
   hasMore?: boolean;
   featured?: boolean;
-  carousel?: boolean; // New prop for 5-card carousel layout
+  carousel?: boolean; // Enables 5-card carousel with center focus
 }
 
+// GameRow Component - Displays games in horizontal rows or carousel format
 export function  GameRow({ games, title, onLoadMore, loading = false, hasMore = true, featured = false, carousel = false }: GameRowProps) {
+  // References and state for scroll functionality
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0); // Track current center card for carousel
+  const [currentIndex, setCurrentIndex] = useState(0); // Track center card in carousel
   
-  // Drag functionality states
+  // State for drag/swipe functionality
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeftStart, setScrollLeftStart] = useState(0);
 
+  // Function to show/hide navigation arrows based on scroll position
   const checkScrollButtons = () => {
     if (carousel) {
       // Carousel mode: show arrows based on current index
@@ -164,8 +168,8 @@ export function  GameRow({ games, title, onLoadMore, loading = false, hasMore = 
   ));
 
   return (
-    <section className="mb-20">
-      <h2 className="text-white font-montserrat text-2xl md:text-3xl lg:text-4xl font-bold tracking-wider text-center underline decoration-2 underline-offset-4 mb-12 lg:mb-16 uppercase">
+    <section className="mb-20 relative z-20">
+      <h2 className="text-white font-montserrat text-2xl md:text-3xl lg:text-4xl font-bold tracking-wider text-center underline decoration-2 underline-offset-4 mb-12 lg:mb-16 uppercase relative z-30">
         {title}
       </h2>
 

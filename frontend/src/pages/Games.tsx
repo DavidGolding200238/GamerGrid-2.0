@@ -3,14 +3,32 @@ import { GameRow } from "../components/GameRow";
 import { useState, useEffect } from "react";
 import { Game } from "../../../shared/api";
 
-// API integration functions - replace these with your actual API calls
+// Animated Background Component - Floating light beams
+const AnimatedBackground = () => {
+  return (
+    <div className="animated-bg-container">
+      <div className="light x1"></div>
+      <div className="light x2"></div>
+      <div className="light x3"></div>
+      <div className="light x4"></div>
+      <div className="light x5"></div>
+      <div className="light x6"></div>
+      <div className="light x7"></div>
+      <div className="light x8"></div>
+      <div className="light x9"></div>
+    </div>
+  );
+};
+
+// Custom React Hook - Manages all API calls and game data state
 const useGameAPI = () => {
+  // State variables to store games and loading status
   const [topGames, setTopGames] = useState<Game[]>([]);
   const [shooterGames, setShooterGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Function to fetch random games for the top row
+  // Fetch popular games from our backend API
   const fetchTopGames = async () => {
     try {
       setLoading(true);
@@ -26,7 +44,7 @@ const useGameAPI = () => {
     }
   };
 
-  // Function to fetch shooter games
+  // Fetch games by genre (shooter games in this case)
   const fetchShooterGames = async () => {
     try {
       setLoading(true);
@@ -42,10 +60,9 @@ const useGameAPI = () => {
     }
   };
 
-  // Function to load more games for infinite scroll
+  // Infinite scroll functionality - loads more games when user scrolls
   const loadMoreTopGames = async () => {
     try {
-      const currentPage = Math.floor(topGames.length / 10) + 1;
       const response = await fetch(`/api/games/random?limit=10&offset=${topGames.length}`);
       if (!response.ok) throw new Error('Failed to fetch more games');
       const data = await response.json();
@@ -66,6 +83,7 @@ const useGameAPI = () => {
     }
   };
 
+  // Return all state and functions for components to use
   return {
     topGames,
     shooterGames,
@@ -78,7 +96,9 @@ const useGameAPI = () => {
   };
 };
 
+// Main Games Page Component
 export default function Games() {
+  // Use our custom hook to get game data and functions
   const {
     topGames,
     shooterGames,
@@ -90,12 +110,14 @@ export default function Games() {
     loadMoreShooterGames,
   } = useGameAPI();
 
+  // Load games when component first renders
   useEffect(() => {
     // Initial load - now using real API
     fetchTopGames();
     fetchShooterGames();
   }, []);
 
+  // Show error page if something goes wrong
   if (error) {
     return (
       <div className="min-h-screen bg-background text-foreground">
@@ -125,12 +147,18 @@ export default function Games() {
     );
   }
 
+  // Main page layout
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <Header />
+    <div className="min-h-screen text-foreground relative overflow-hidden">
+      {/* Animated Background */}
+      <AnimatedBackground />
+      
+      {/* Main Content - positioned above background */}
+      <div className="relative z-10 min-h-screen">
+        <Header />
 
-      <main className="max-w-[1869px] mx-auto py-12">
-        {/* TOP GAMES Section - Horizontal Sliding Row */}
+      <main className="max-w-[1869px] mx-auto py-12 relative z-20">
+        {/* Carousel section with 5 cards and drag functionality */}
         <GameRow
           games={topGames}
           title="TOP GAMES"
@@ -141,10 +169,10 @@ export default function Games() {
           carousel={true}
         />
 
-        {/* Divider Line */}
+        {/* Visual separator between sections */}
         <div className="w-full h-px bg-white my-16"></div>
 
-        {/* SHOOTERS Section - Now using GameRow for consistent styling */}
+        {/* Second row showing shooter games */}
         <GameRow
           games={shooterGames}
           title="SHOOTERS"
@@ -168,6 +196,7 @@ export default function Games() {
           </span>
         </div>
       </main>
+      </div>
     </div>
   );
 

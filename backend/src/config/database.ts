@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Database configuration
+// MySQL database connection configuration
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '3306'),
@@ -11,14 +11,14 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'game_grid_db',
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 10, // Maximum concurrent connections
   queueLimit: 0,
 };
 
-// Create connection pool
+// Create MySQL connection pool for better performance
 export const pool = mysql.createPool(dbConfig);
 
-// Test database connection
+// Test if database connection works
 export async function testConnection() {
   try {
     const connection = await pool.getConnection();

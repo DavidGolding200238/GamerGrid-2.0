@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../config/database.js';
 
+// TypeScript interfaces for type safety
 export interface User {
   id: number;
   username: string;
@@ -16,18 +17,18 @@ export interface AuthTokens {
   user: User;
 }
 
-// Hash password
+// Hash password using bcrypt for security
 export async function hashPassword(password: string): Promise<string> {
-  const saltRounds = 12;
+  const saltRounds = 12; // Strong hashing rounds
   return await bcrypt.hash(password, saltRounds);
 }
 
-// Verify password
+// Verify password against stored hash
 export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
   return await bcrypt.compare(password, hashedPassword);
 }
 
-// Generate JWT token
+// Generate JWT token for user authentication
 export function generateTokens(user: User): AuthTokens {
   const secret = process.env.JWT_SECRET;
   if (!secret) {

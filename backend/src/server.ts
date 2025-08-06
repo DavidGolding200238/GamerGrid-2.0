@@ -1,18 +1,19 @@
 import { createServer } from './index.js';
 import { testConnection, initializeDatabase } from "./config/database.js";
 
+// Main server startup function
 async function startServer() {
-  // Test database connection
+  // Check if MySQL database is accessible
   const isConnected = await testConnection();
   if (!isConnected) {
     console.error('Failed to connect to database. Please check your MySQL configuration.');
     process.exit(1);
   }
 
-  // Initialize database tables
+  // Create database tables if they don't exist
   await initializeDatabase();
 
-  // Start the server
+  // Start Express server
   const app = createServer();
   const PORT = process.env.PORT || 3000;
 
@@ -22,4 +23,5 @@ async function startServer() {
   });
 }
 
+// Start the application
 startServer().catch(console.error);
