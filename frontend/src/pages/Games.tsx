@@ -158,15 +158,14 @@ export default function Games() {
         <Header />
 
       <main className="max-w-[1869px] mx-auto py-12 relative z-20">
-        {/* Carousel section with 5 cards and drag functionality */}
+        {/* Top Games - Hero grid layout */}
         <GameRow
           games={topGames}
           title="TOP GAMES"
           onLoadMore={loadMoreTopGames}
           loading={loading}
           hasMore={true}
-          featured={true}
-          carousel={true}
+          gridFeatured={true}
         />
 
         {/* Visual separator between sections */}

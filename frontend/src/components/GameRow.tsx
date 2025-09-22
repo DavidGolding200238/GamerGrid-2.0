@@ -11,10 +11,11 @@ interface GameRowProps {
   hasMore?: boolean;
   featured?: boolean;
   carousel?: boolean; // Enables 5-card carousel with center focus
+  gridFeatured?: boolean; // Hero grid layout
 }
 
 // GameRow Component - Displays games in horizontal rows or carousel format
-export function  GameRow({ games, title, onLoadMore, loading = false, hasMore = true, featured = false, carousel = false }: GameRowProps) {
+export function  GameRow({ games, title, onLoadMore, loading = false, hasMore = true, featured = false, carousel = false, gridFeatured = false }: GameRowProps) {
   // References and state for scroll functionality
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -52,6 +53,86 @@ export function  GameRow({ games, title, onLoadMore, loading = false, hasMore = 
       }
     }
   }, [games, currentIndex, carousel]);
+
+  // Hero grid layout with large featured card + 6 smaller cards
+  if (gridFeatured) {
+    const [activeFeatured, setActiveFeatured] = useState(0);
+    
+    return (
+      <section className="mt-10 lg:mt-14 mb-24">
+        <h2 className="text-white font-montserrat text-2xl md:text-3xl lg:text-4xl font-bold tracking-wider text-center underline decoration-2 underline-offset-4 mb-12 lg:mb-16 uppercase relative z-30">
+          {title}
+        </h2>
+        
+        <div className="px-6 lg:px-12">
+          <div className="grid lg:grid-cols-5 gap-8 items-stretch">
+            {/* Large featured game - takes 3 columns */}
+            <div className="lg:col-span-3 relative group rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-sm shadow-xl min-h-[420px] lg:min-h-[520px] flex">
+              {games.length > 0 ? (
+                <>
+                  <div className="absolute inset-0">
+                    <img src={games[activeFeatured % games.length].image} 
+                         alt={games[activeFeatured % games.length].title} 
+                         className="w-full h-full object-cover opacity-70 group-hover:opacity-80 transition-opacity duration-700" 
+                         loading="lazy" />
+                    <div className="absolute inset-0 bg-gradient-to-tr from-black/70 via-black/40 to-transparent" />
+                  </div>
+                  <div className="relative z-10 p-6 lg:p-10 flex flex-col justify-end w-full">
+                    <div className="mb-4 flex gap-2 flex-wrap">
+                      {games[activeFeatured % games.length].genres.slice(0,3).map(g => 
+                        <span key={g} className="px-3 py-1 rounded-full bg-accent text-black text-xs font-jost tracking-wide">{g}</span>
+                      )}
+                    </div>
+                    <h1 className="text-white font-montserrat text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight drop-shadow-lg max-w-xl leading-[1.1]">
+                      {games[activeFeatured % games.length].title}
+                    </h1>
+                    <div className="mt-6 flex items-center gap-6">
+                      <button onClick={() => setActiveFeatured(i => (i + 1) % Math.max(1, games.length))} 
+                              className="px-5 py-2.5 rounded-lg bg-accent text-black font-jost font-bold uppercase tracking-wider text-xs lg:text-sm shadow-[0_0_0_0_rgba(255,255,255,0.15)] hover:shadow-[0_0_0_4px_rgba(255,255,255,0.25)] transition-all">
+                        Next
+                      </button>
+                      <div className="flex items-center gap-2">
+                        {games.slice(0,5).map((_, idx) => 
+                          <span key={idx} className={`w-2 h-2 rounded-full ${idx === activeFeatured % 5 ? 'bg-accent' : 'bg-white/30'} transition-colors`} />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="m-auto text-white/60 font-jost tracking-wide text-sm">Loading featured...</div>
+              )}
+            </div>
+
+            {/* Smaller featured games grid - takes 2 columns */}
+            <div className="lg:col-span-2 grid sm:grid-cols-3 lg:grid-cols-2 gap-4 content-start">
+              {games.slice(0,6).map((g, idx) => (
+                <button key={g.id} 
+                        onClick={() => setActiveFeatured(idx)} 
+                        className={`group relative rounded-xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-sm shadow-md h-40 sm:h-44 lg:h-48 text-left transition-all ${idx === activeFeatured ? 'ring-2 ring-accent' : 'hover:ring-2 hover:ring-white/30'}`}>
+                  <img src={g.image} 
+                       alt={g.title} 
+                       className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity" 
+                       loading="lazy" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                  <div className="absolute bottom-2 left-2 right-2">
+                    <h3 className="text-white font-monomaniac text-xs sm:text-sm font-normal leading-snug line-clamp-2">
+                      {g.title}
+                    </h3>
+                  </div>
+                </button>
+              ))}
+              {games.length === 0 && 
+                <div className="col-span-full text-center text-white/50 font-jost text-sm">
+                  Preparing highlights...
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   const scrollLeft = () => {
     if (carousel) {

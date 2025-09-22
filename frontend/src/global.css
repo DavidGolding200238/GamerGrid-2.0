@@ -7,92 +7,33 @@
 @tailwind utilities;
 
 @layer base {
-  /**
-   * Tailwind CSS theme
-   * tailwind.config.ts expects the following color variables to be expressed as HSL values.
-   * A different format will require also updating the theme in tailwind.config.ts.
-  */
   :root {
-    /* Game Grid Theme */
-    --background: 0 0% 16%; /* #282828 */
-    --foreground: 0 0% 100%;
-
-    --card: 0 0% 11%; /* #1B1919 */
-    --card-foreground: 0 0% 100%;
-
-    --popover: 0 0% 11%;
-    --popover-foreground: 0 0% 100%;
-
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 16%;
-
-    --secondary: 0 0% 11%;
-    --secondary-foreground: 0 0% 100%;
-
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 70%;
-
-    --accent: 54 100% 50%; /* #FFEA00 - Yellow accent */
-    --accent-foreground: 0 0% 0%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 0 0% 100%;
-
+    --background: 220 13% 9%;
+    --foreground: 220 13% 98%;
+    --card: 220 13% 12%;
+    --card-foreground: 220 13% 98%;
+    --popover: 220 13% 12%;
+    --popover-foreground: 220 13% 98%;
+    --primary: 220 13% 98%;
+    --primary-foreground: 220 13% 9%;
+    --secondary: 220 13% 15%;
+    --secondary-foreground: 220 13% 98%;
+    --muted: 220 13% 15%;
+    --muted-foreground: 220 13% 63%;
+    --accent: 47 96% 53%;
+    --accent-foreground: 220 13% 9%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 220 13% 98%;
+    --border: 220 13% 20%;
+    --input: 220 13% 20%;
+    --ring: 220 13% 63%;
     --radius: 0.5rem;
-
+    
     /* Game Grid specific colors */
-    --header-bg: 0 0% 11%; /* #1C1818 */
-    --game-card-bg: 0 0% 11%; /* #1B1919 */
-    --gradient-start: 184 100% 49%; /* #03F8EB */
-    --gradient-end: 54 100% 54%; /* #F8D219 */
-
-    --sidebar-background: 0 0% 16%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 0 0% 16%;
-    --sidebar-accent: 0 0% 20%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 0 0% 20%;
-    --sidebar-ring: 0 0% 100%;
-  }
-
-  .dark {
-    /* Same as light mode for Game Grid */
-    --background: 0 0% 16%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 11%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 11%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 16%;
-    --secondary: 0 0% 11%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 70%;
-    --accent: 54 100% 50%;
-    --accent-foreground: 0 0% 0%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 0 0% 100%;
-    --header-bg: 0 0% 11%;
-    --game-card-bg: 0 0% 11%;
-    --gradient-start: 184 100% 49%;
-    --gradient-end: 54 100% 54%;
-    --sidebar-background: 0 0% 16%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 0 0% 16%;
-    --sidebar-accent: 0 0% 20%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 0 0% 20%;
-    --sidebar-ring: 0 0% 100%;
+    --header-bg: 220 13% 11%;
+    --game-card-bg: 220 13% 14%;
+    --gradient-start: 220 13% 9%;
+    --gradient-end: 220 13% 6%;
   }
 }
 
@@ -100,132 +41,34 @@
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
+    min-height: 100vh;
   }
 }
 
-@layer utilities {
-  /* Line clamp utilities */
-  .line-clamp-1 {
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
-  }
-  
-  .line-clamp-2 {
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-  }
-  
-  .line-clamp-3 {
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-  }
-
-  /* Scrollbar hide utility */
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
+/* Custom scrollbar styles */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-/* Animated Background Styles */
-.animated-bg-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(135deg, hsl(220, 15%, 12%) 0%, hsl(230, 20%, 8%) 50%, hsl(240, 25%, 5%) 100%);
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
-.light {
-  position: absolute;
-  width: 2px;
-  height: 120px;
-  opacity: 0.9;
-  background-color: hsl(var(--accent));
-  box-shadow: 
-    hsl(var(--accent) / 0.8) 0px 0px 20px 3px,
-    hsl(var(--accent) / 0.6) 0px 0px 40px 6px;
-  filter: blur(0.3px);
-  opacity: 0;
-  top: 100vh;
-  bottom: 0px;
-  left: 0px;
-  right: 0px;
-  margin: auto;
+/* Line clamp utilities */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
 }
 
-.x1 {
-  animation: floatUp 4s infinite linear;
-  transform: scale(0.5);
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-.x2 {
-  animation: floatUp 7s infinite linear;
-  transform: scale(0.8);
-  left: 15%;
-}
-
-.x3 {
-  animation: floatUp 2.5s infinite linear;
-  transform: scale(0.3);
-  left: -15%;
-}
-
-.x4 {
-  animation: floatUp 4.5s infinite linear;
-  transform: scale(0.6);
-  left: -34%;
-}
-
-.x5 {
-  animation: floatUp 8s infinite linear;
-  transform: scale(1.0);
-  left: -57%;
-}
-
-.x6 {
-  animation: floatUp 3s infinite linear;
-  transform: scale(0.4);
-  left: -81%;
-}
-
-.x7 {
-  animation: floatUp 5.3s infinite linear;
-  transform: scale(1.2);
-  left: 37%;
-}
-
-.x8 {
-  animation: floatUp 4.7s infinite linear;
-  transform: scale(0.7);
-  left: 62%;
-}
-
-.x9 {
-  animation: floatUp 4.1s infinite linear;
-  transform: scale(0.5);
-  left: 85%;
-}
-
-@keyframes floatUp {
-  0% { top: 100vh; opacity: 0; }
-  25% { opacity: 1; }
-  50% { top: 0vh; opacity: 0.8; }
-  75% { opacity: 1; }
-  100% { top: -100vh; opacity: 0; }
-}
