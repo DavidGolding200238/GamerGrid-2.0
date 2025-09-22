@@ -24,6 +24,6 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["src/**/*", "../shared/**/*"],
+  "include": ["src/**/*", "../shared/**/*", "../frontend/src/services/newsApi.ts"],
   "exclude": ["node_modules", "dist"]
 }
