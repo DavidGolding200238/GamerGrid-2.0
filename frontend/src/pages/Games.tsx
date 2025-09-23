@@ -27,6 +27,7 @@ const useGameAPI = () => {
   const [shooterGames, setShooterGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   // Fetch popular games from our backend API
   const fetchTopGames = async () => {
@@ -93,6 +94,8 @@ const useGameAPI = () => {
     fetchShooterGames,
     loadMoreTopGames,
     loadMoreShooterGames,
+    search,
+    setSearch,
   };
 };
 
@@ -103,11 +106,15 @@ export default function Games() {
     topGames,
     shooterGames,
     loading,
+    search,
+    setSearch,
     error,
     fetchTopGames,
     fetchShooterGames,
     loadMoreTopGames,
     loadMoreShooterGames,
+    
+    
   } = useGameAPI();
 
   // Load games when component first renders
@@ -161,12 +168,44 @@ export default function Games() {
         {/* Top Games - Hero grid layout */}
         <GameRow
           games={topGames}
-          title="TOP GAMES"
+          //title="TOP GAMES"
           onLoadMore={loadMoreTopGames}
           loading={loading}
           hasMore={true}
           gridFeatured={true}
         />
+
+     {/* Filter Bar */}
+<section className="mb-20">
+  <div className="flex flex-col lg:flex-row lg:items-center gap-6 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl px-6 py-6 shadow-[0_4px_30px_-5px_rgba(0,0,0,0.4)]">
+    <div className="flex-1">
+      <h2 className="text-white font-montserrat text-xl md:text-2xl font-bold tracking-wide flex items-center gap-3">
+        Browse Library <span className="h-px w-16 bg-gradient-to-r from-accent to-transparent" />
+      </h2>
+      <p className="text-white font-inter text-sm md:text-base tracking-wide mt-1">
+        Discover new games by genre, platform, or popularity
+      </p>
+    </div>
+
+    <div className="flex-1 max-w-lg">
+      <label className="block">
+        <span className="sr-only">Search games</span>
+        <div className="relative">
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="search games..."
+            className="w-full bg-black/40 border border-white/15 rounded-lg px-4 py-3 pr-11 text-white placeholder-white/40 font-jost tracking-wide focus:outline-none focus:ring-2 focus:ring-accent/70 focus:border-accent/70 transition" 
+          />
+          <svg className="w-5 h-5 absolute top-1/2 -translate-y-1/2 right-3 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18.5a7.5 7.5 0 006.15-3.85z" />
+          </svg>
+        </div>
+      </label>
+    </div>
+  </div>
+</section>
+
 
         {/* Visual separator between sections */}
         <div className="w-full h-px bg-white my-16"></div>
