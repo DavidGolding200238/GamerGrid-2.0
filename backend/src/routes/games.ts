@@ -1,12 +1,42 @@
-import { Request, Response } from 'express';
+import { Request, Response , Router } from 'express';
 import axios from 'axios';
 
 const RAWG_BASE_URL = 'https://api.rawg.io/api';
 const API_KEY = 'c60ed11f699e430485308b3a910b1cb7';
+const router = Router();
 
 if (!API_KEY) {
   throw new Error('RAWG_API_KEY is not set');
 }
+
+router.get('/search', async (req: Request, res: Response) => {
+  try { // ADD THIS - missing try block
+    const { q, limit = 20 } = req.query; // FIX: req.query not require.query
+    
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+    
+    console.log('Searching for:', q);
+
+    // Direct API call instead of using RawgApiService
+    const response = await axios.get(`${RAWG_BASE_URL}/games`, {
+      params: {
+        key: API_KEY,
+        search: q,
+        page_size: parseInt(limit as string),
+      },
+    });
+
+    const formattedGames = formatGames(response.data.results);
+    res.json({ games: formattedGames });
+    
+  } catch (error) {
+    console.error('Error searching games:', error);
+    res.status(500).json({ error: 'Failed to search games' });
+  }
+});
+
 
 // Helper function to shuffle an array (Fisher-Yates shuffle)
 function shuffleArray<T>(array: T[]): T[] {
@@ -160,3 +190,15 @@ export async function getGamesByGenre(req: Request, res: Response) {
     res.status(500).json({ error: 'Failed to fetch games by genre' });
   }
 }
+
+// Add these route definitions at the bottom of your games.ts file
+
+// Set up your routes
+router.get('/', getAllGames);
+router.get('/random', getRandomGames);
+router.get('/top', getTopGames);
+router.get('/genre/:genre', getGamesByGenre);
+// search route is already defined above
+
+// Export the router so it can be used in your main server
+export default router;

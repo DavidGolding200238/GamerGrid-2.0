@@ -29,6 +29,31 @@ const useGameAPI = () => {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
+  const searchGames = async (query: string) => {
+    if (!query.trim()) {
+      // If search is empty, reload original games
+      fetchTopGames();
+      fetchShooterGames();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/games/search?q=${encodeURIComponent(query)}&limit=20`);
+      if (!response.ok) throw new Error('Failed to search games');
+      const data = await response.json();
+
+      setTopGames(data.games || []);
+      setShooterGames([]);
+      setError(null);
+    } catch (err) {
+      setError('Failed to search games');
+      console.error('Search Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch popular games from our backend API
   const fetchTopGames = async () => {
     try {
@@ -84,6 +109,17 @@ const useGameAPI = () => {
     }
   };
 
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (search) {
+        searchGames(search);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [search]);
+
   // Return all state and functions for components to use
   return {
     topGames,
@@ -96,6 +132,7 @@ const useGameAPI = () => {
     loadMoreShooterGames,
     search,
     setSearch,
+    searchGames,
   };
 };
 
@@ -119,7 +156,6 @@ export default function Games() {
 
   // Load games when component first renders
   useEffect(() => {
-    // Initial load - now using real API
     fetchTopGames();
     fetchShooterGames();
   }, []);
@@ -168,7 +204,7 @@ export default function Games() {
         {/* Top Games - Hero grid layout */}
         <GameRow
           games={topGames}
-          //title="TOP GAMES"
+          title="TOP GAMES"
           onLoadMore={loadMoreTopGames}
           loading={loading}
           hasMore={true}

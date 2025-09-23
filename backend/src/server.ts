@@ -1,5 +1,8 @@
 import { createServer } from './index.js';
 import { testConnection, initializeDatabase } from "./config/database.js";
+import gamesRouter from './routes/games.js';
+
+
 
 // Main server startup function
 async function startServer() {
@@ -16,6 +19,8 @@ async function startServer() {
   // Start Express server
   const app = createServer();
   const PORT = process.env.PORT || 3000;
+
+  app.use('/api/games', gamesRouter);
 
   app.listen(PORT, () => {
     console.log(`🚀 Backend server running on http://localhost:${PORT}`);

@@ -129,3 +129,11 @@ export async function fetchRandomGames(page: number = 1, pageSize: number = 10):
     ordering: randomOrdering,
   });
 }
+
+export async function fetchGamesBySearch(query: string, page: number = 1, pageSize: number = 20): Promise<GamesResponse> {
+  return fetchGamesFromRAWG({
+    page,
+    pageSize,
+    search: query,
+  });
+}
