@@ -11,31 +11,32 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'game_grid_db',
   waitForConnections: true,
-  connectionLimit: 10, // Maximum concurrent connections
+  connectionLimit: 10,
   queueLimit: 0,
 };
 
 // Create MySQL connection pool for better performance
 export const pool = mysql.createPool(dbConfig);
+export const db = pool;
 
 // Test if database connection works
 export async function testConnection() {
   try {
     const connection = await pool.getConnection();
-    console.log('✅ Database connected successfully');
+    console.log(' Database connected successfully');
     
     // Test if we can actually query the database
     const [result] = await connection.execute('SELECT DATABASE() as current_db') as any;
-    console.log('📋 Current database:', result[0]?.current_db);
+    console.log('Current database:', result[0]?.current_db);
     
     // Test if game_grid_db exists
     const [databases] = await connection.execute('SHOW DATABASES LIKE "game_grid_db"') as any;
-    console.log('🗄️ game_grid_db exists:', databases.length > 0);
+    console.log(' game_grid_db exists:', databases.length > 0);
     
     connection.release();
     return true;
   } catch (error) {
-    console.error('❌ Database connection failed:', error);
+    console.error(' Database connection failed:', error);
     return false;
   }
 }
@@ -71,6 +72,36 @@ export async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         UNIQUE KEY unique_user_game_status (user_id, game_id, status)
+      )
+    `);
+
+
+       // ADD COMMUNITY TABLES
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS communities (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        description TEXT NOT NULL,
+        category VARCHAR(50) NOT NULL,
+        image_url VARCHAR(500),
+        member_count INT DEFAULT 0,
+        post_count INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS community_posts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        community_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        image_url VARCHAR(500),
+        author VARCHAR(100) DEFAULT 'Anonymous',
+        likes_count INT DEFAULT 0,
+        comments_count INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE
       )
     `);
 
