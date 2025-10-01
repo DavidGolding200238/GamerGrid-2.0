@@ -1,23 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Header } from "../components/Header";
 import { communityApi, Community as CommunityType, Post as PostType, CreateCommunityData, CreatePostData } from '../services/communityApi';
-
-// Animated Background Component - Floating light beams
-const AnimatedBackground = () => {
-  return (
-    <div className="animated-bg-container">
-      <div className="light x1"></div>
-      <div className="light x2"></div>
-      <div className="light x3"></div>
-      <div className="light x4"></div>
-      <div className="light x5"></div>
-      <div className="light x6"></div>
-      <div className="light x7"></div>
-      <div className="light x8"></div>
-      <div className="light x9"></div>
-    </div>
-  );
-};
+import { NetworkBackground } from '../components/NetworkBackground';
 
 // Helper to resolve image URLs from the backend
 const resolveImageUrl = (url?: string) =>
@@ -155,7 +139,7 @@ export default function Community() {
   if (selectedCommunity) {
     return (
       <div className="min-h-screen text-foreground relative overflow-hidden">
-        <AnimatedBackground />
+        <NetworkBackground />
         
         <div className="relative z-10 min-h-screen">
           <Header />
@@ -364,7 +348,7 @@ export default function Community() {
 
   return (
     <div className="min-h-screen text-foreground relative overflow-hidden">
-      <AnimatedBackground />
+      <NetworkBackground />
       
       <div className="relative z-10 min-h-screen">
         <Header />

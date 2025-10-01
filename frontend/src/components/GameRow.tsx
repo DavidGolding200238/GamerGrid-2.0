@@ -12,10 +12,11 @@ interface GameRowProps {
   featured?: boolean;
   carousel?: boolean; // Enables 5-card carousel with center focus
   gridFeatured?: boolean; // Hero grid layout
+  onSelectGame?: (game: Game) => void; // Callback when a game is selected
 }
 
 // GameRow Component - Displays games in horizontal rows or carousel format
-export function  GameRow({ games, title, onLoadMore, loading = false, hasMore = true, featured = false, carousel = false, gridFeatured = false }: GameRowProps) {
+export function GameRow({ games, title, onLoadMore, loading = false, hasMore = true, featured = false, carousel = false, gridFeatured = false, onSelectGame }: GameRowProps) {
   // References and state for scroll functionality
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -324,7 +325,12 @@ export function  GameRow({ games, title, onLoadMore, loading = false, hasMore = 
             <div className="flex gap-6 px-6 lg:px-12" style={{ width: 'max-content' }}>
               {/* Actual game cards */}
               {games.map((game) => (
-                <GameCard key={game.id} game={game} featured={featured} />
+                <GameCard 
+                  key={game.id} 
+                  game={game} 
+                  featured={featured}
+                  onSelect={onSelectGame} 
+                />
               ))}
               
               {/* Loading placeholders */}

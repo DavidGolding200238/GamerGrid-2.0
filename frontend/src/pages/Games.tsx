@@ -1,24 +1,11 @@
 import { Header } from "../components/Header";
 import { GameRow } from "../components/GameRow";
+import { GameDetailOverlay } from "../components/GameDetailOverlay";
 import { useState, useEffect } from "react";
 import { Game } from "../../../shared/api";
+import { NetworkBackground } from "../components/NetworkBackground";
 
-// Animated Background Component - Floating light beams
-const AnimatedBackground = () => {
-  return (
-    <div className="animated-bg-container">
-      <div className="light x1"></div>
-      <div className="light x2"></div>
-      <div className="light x3"></div>
-      <div className="light x4"></div>
-      <div className="light x5"></div>
-      <div className="light x6"></div>
-      <div className="light x7"></div>
-      <div className="light x8"></div>
-      <div className="light x9"></div>
-    </div>
-  );
-};
+// Replaced old beam background with shared network background
 
 // Custom React Hook - Manages all API calls and game data state
 const useGameAPI = () => {
@@ -148,11 +135,12 @@ export default function Games() {
     error,
     fetchTopGames,
     fetchShooterGames,
-    loadMoreTopGames,
+    // Not needed in new design
+    // loadMoreTopGames,
     loadMoreShooterGames,
-    
-    
   } = useGameAPI();
+  
+  const [activeGame, setActiveGame] = useState<Game | null>(null);
 
   // Load games when component first renders
   useEffect(() => {
@@ -193,23 +181,48 @@ export default function Games() {
   // Main page layout
   return (
     <div className="min-h-screen text-foreground relative overflow-hidden">
-      {/* Animated Background */}
-      <AnimatedBackground />
-      
-      {/* Main Content - positioned above background */}
-      <div className="relative z-10 min-h-screen">
+      <NetworkBackground />
+      <div className="relative z-10 min-h-screen flex flex-col">
         <Header />
-
-      <main className="max-w-[1869px] mx-auto py-12 relative z-20">
-        {/* Top Games - Hero grid layout */}
-        <GameRow
-          games={topGames}
-          title="TOP GAMES"
-          onLoadMore={loadMoreTopGames}
-          loading={loading}
-          hasMore={true}
-          gridFeatured={true}
-        />
+        <main className="flex-1 mx-auto w-full max-w-[1920px] px-4 sm:px-6 lg:px-12 pb-24 relative z-20">
+          {/* Hero Section */}
+          <section className="mt-10 lg:mt-14 mb-24">
+            <div className="grid lg:grid-cols-5 gap-8 items-stretch">
+              <div className="lg:col-span-3 relative group rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-sm shadow-xl min-h-[420px] lg:min-h-[520px] flex">
+                {topGames.length > 0 ? (
+                  <>
+                    <div className="absolute inset-0">
+                      <img src={topGames[0].image} alt={topGames[0].title} className="w-full h-full object-cover opacity-70 group-hover:opacity-80 transition-opacity duration-700" loading="lazy" />
+                      <div className="absolute inset-0 bg-gradient-to-tr from-black/70 via-black/40 to-transparent" />
+                    </div>
+                    <div className="relative z-10 p-6 lg:p-10 flex flex-col justify-end w-full">
+                      <div className="mb-4 flex gap-2 flex-wrap">
+                        {topGames[0].genres.slice(0,3).map(g => <span key={g} className="px-3 py-1 rounded-full bg-accent text-black text-xs font-jost tracking-wide">{g}</span>)}
+                      </div>
+                      <h1 className="text-white font-montserrat text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight drop-shadow-lg max-w-xl leading-[1.1]">{topGames[0].title}</h1>
+                      <div className="mt-6 flex items-center gap-6">
+                        <button onClick={() => setActiveGame(topGames[0])} className="px-5 py-2.5 rounded-lg bg-accent text-black font-jost font-bold uppercase tracking-wider text-xs lg:text-sm shadow-[0_0_0_0_rgba(255,255,255,0.15)] hover:shadow-[0_0_0_4px_rgba(255,255,255,0.25)] transition-all">View Details</button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="m-auto text-white/60 font-jost tracking-wide text-sm">Loading featured...</div>
+                )}
+              </div>
+              <div className="lg:col-span-2 grid sm:grid-cols-3 lg:grid-cols-2 gap-4 content-start">
+                {topGames.slice(1,7).map((g) => (
+                  <button key={g.id} onClick={() => setActiveGame(g)} className="group relative rounded-xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-sm shadow-md h-40 sm:h-44 lg:h-48 text-left transition-all hover:ring-2 hover:ring-white/30">
+                    <img src={g.image} alt={g.title} className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity" loading="lazy" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                    <div className="absolute bottom-2 left-2 right-2">
+                      <h3 className="text-white font-monomaniac text-xs sm:text-sm font-normal leading-snug line-clamp-2">{g.title}</h3>
+                    </div>
+                  </button>
+                ))}
+                {topGames.length === 0 && <div className="col-span-full text-center text-white/50 font-jost text-sm">Loading top games...</div>}
+              </div>
+            </div>
+          </section>
 
      {/* Filter Bar */}
 <section className="mb-20">
@@ -243,33 +256,25 @@ export default function Games() {
 </section>
 
 
-        {/* Visual separator between sections */}
-        <div className="w-full h-px bg-white my-16"></div>
+          <GameRow games={shooterGames} title="Shooter Spotlight" onLoadMore={loadMoreShooterGames} loading={loading} hasMore={true} />
 
-        {/* Second row showing shooter games */}
-        <GameRow
-          games={shooterGames}
-          title="SHOOTERS"
-          onLoadMore={loadMoreShooterGames}
-          loading={loading}
-          hasMore={true}
-          featured={false}
-        />
-
-        {/* EXPLORE Section Header */}
-        <div className="flex justify-center mt-16 mb-12">
-          <h2 className="text-white font-montserrat text-2xl md:text-3xl lg:text-4xl font-bold tracking-wider uppercase">
-            Explore
-          </h2>
-        </div>
-
-        {/* Platform Info */}
-        <div className="flex justify-center mt-6 lg:mt-8">
-          <span className="text-white font-inter text-sm lg:text-base tracking-wider">
-            
-          </span>
-        </div>
-      </main>
+          <section className="mt-24">
+            <div className="text-center mb-10">
+              <h2 className="text-white font-montserrat text-2xl md:text-3xl lg:text-4xl font-bold tracking-wider uppercase">Explore</h2>
+              <p className="mt-4 text-white/60 font-jost text-sm tracking-wide max-w-xl mx-auto">Dive deeper by genre or combine filters. Dynamic discovery incoming.</p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="group relative rounded-xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-sm h-40 flex items-end p-5 transition-all hover:border-accent/50 hover:shadow-[0_0_0_2px_rgba(255,255,255,0.15)]">
+                <div className="absolute inset-0 bg-gradient-to-tr from-black/70 via-black/30 to-transparent opacity-70 group-hover:opacity-60 transition" />
+                <div className="relative z-10">
+                  <h3 className="text-white font-montserrat font-semibold text-lg tracking-wide">Coming Soon</h3>
+                  <p className="text-accent font-jost text-xs mt-1 tracking-wide">More genres and filters</p>
+                </div>
+              </div>
+            </div>
+          </section>
+  </main>
+  {activeGame && <GameDetailOverlay game={activeGame} onClose={()=>setActiveGame(null)} />}
       </div>
     </div>
   );

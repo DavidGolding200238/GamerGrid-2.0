@@ -13,6 +13,8 @@ import SignIn from "./pages/SignIn";
 import Community from "./pages/Community";
 import News from "./pages/News";
 import NotFound from "./pages/NotFound";
+import Dashboard from "./pages/Dashboard";
+import Home from "./pages/Home";
 
 const queryClient = new QueryClient();
 
@@ -23,12 +25,16 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
+          
+          <Route path="/index" element={<Index />} />
           <Route path="/games" element={<Games />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/community" element={<Community />} />
           <Route path="/news" element={<News />} />
+          <Route path="/home" element={<Home/>} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/" element={<Index />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

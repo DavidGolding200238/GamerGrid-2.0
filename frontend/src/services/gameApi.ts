@@ -1,7 +1,24 @@
 import { Game } from "../../../shared/api";
 
+// Define types for communities and news
+interface CommunityItem { 
+  id: string; 
+  name: string; 
+  members: number; 
+  image?: string; 
+  tagline?: string;
+}
+
+interface NewsItem {
+  id: string;
+  title: string;
+  source: string;
+  image?: string;
+  published: string;
+}
+
 // Configuration - Update these with your actual API details
-const API_BASE_URL = process.env.REACT_APP_GAME_API_URL || 'YOUR_API_BASE_URL_HERE';
+const API_BASE_URL = import.meta.env.VITE_GAME_API_URL || '/api';
 
 interface ApiResponse<T> {
   data: T;
@@ -123,6 +140,44 @@ export class GameApiService {
     } catch (error) {
       console.error('Failed to fetch games with filters:', error);
       throw new Error('Failed to fetch games with filters');
+    }
+  }
+  
+  /**
+   * Fetch communities
+   * TODO: Replace with your actual API endpoint
+   */
+  async fetchCommunities(limit: number = 5): Promise<CommunityItem[]> {
+    try {
+      // For now, return mock data until you connect your API
+      console.log(`API Call: Fetch ${limit} communities`);
+      return [
+        { id: 'c1', name: 'Speedrunners Hub', members: 12450, tagline: 'Frames matter.', image: 'https://picsum.photos/seed/comm1/500/500' },
+        { id: 'c2', name: 'Indie Forge', members: 8421, tagline: 'Build. Share. Iterate.', image: 'https://picsum.photos/seed/comm2/500/500' },
+        { id: 'c3', name: 'Tactical Minds', members: 6312, tagline: 'Every move counts.', image: 'https://picsum.photos/seed/comm3/500/500' }
+      ];
+    } catch (error) {
+      console.error('Failed to fetch communities:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch news
+   * TODO: Replace with your actual API endpoint
+   */
+  async fetchNews(limit: number = 6): Promise<NewsItem[]> {
+    try {
+      // For now, return mock data until you connect your API
+      console.log(`API Call: Fetch ${limit} news items`);
+      return [
+        { id: 'n1', title: 'Major Studio Announces Surprise Title', source: 'GameWire', image: 'https://picsum.photos/seed/news1/800/500', published: '2025-08-09' },
+        { id: 'n2', title: 'Indie Breakout Smashes Charts Globally', source: 'IndiePulse', image: 'https://picsum.photos/seed/news2/800/500', published: '2025-08-08' },
+        { id: 'n3', title: 'Competitive Finals Set New Viewership Record', source: 'eSportsCentral', image: 'https://picsum.photos/seed/news3/800/500', published: '2025-08-07' }
+      ];
+    } catch (error) {
+      console.error('Failed to fetch news:', error);
+      return [];
     }
   }
 }

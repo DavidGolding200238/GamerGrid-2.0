@@ -1,6 +1,7 @@
 import { Header } from "../components/Header";
 import { useState, useEffect} from 'react';
 import {newsApi, NewsArticle} from "../services/newsApi";
+import { NetworkBackground } from "../components/NetworkBackground";
 
 export default function News() {
   const[articles, setArticles] = useState<NewsArticle[]>([]);
@@ -36,10 +37,12 @@ export default function News() {
   }
 
 return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative"> 
+      <NetworkBackground /> 
       <Header />
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 relative z-10"> 
         <h1 className="text-3xl font-bold mb-6">Gaming News</h1>
+
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {articles.map((article) => (
