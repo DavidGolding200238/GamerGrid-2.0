@@ -2,20 +2,28 @@ import { Router} from 'express';
 import axios from 'axios';
 
 const router = Router();
-const APITUBE_BASE_URL = 'https://api.apitube.io/v1/news'; 
-const API_KEY = 'api_live_2G6RS6f3YmHDRzAnTSc9LktF0yIDiHzmnd5VBsj9pDNhnEs0D9omM2bucLkl'; // Replace with your actual API key
+const NEWS_API_BASE_URL = 'https://newsapi.org/v2'; 
+const NEWS_API_KEY = process.env.NEWS_API_KEY;
+router.get('/gaming', async (req, res) => {
+  try {
+    const { pageSize = '15', page = '1' } = req.query as { pageSize?: string; page?: string };
 
-//news endpoints
-router.get('gaming', async (req, res) => {
-    try {
-        const { pageSize = '10', page = '1' } = req.query;
-        console.log('Fetching gaming news with pageSize:', {pageSize, page});
-        console.log('APITUBE key:', API_KEY);
+    const { data } = await axios.get(`${NEWS_API_BASE_URL}/everything`, {
+      params: {
+        apiKey: NEWS_API_KEY,
+        q: 'gaming OR "video games" OR playstation OR xbox OR nintendo',
+        language: 'en',
+        pageSize,
+        page,
+        sortBy: 'publishedAt'
+      },
+    });
 
-        const response = await axios.get(`${APITUBE_BASE_URL}/gaming`, {
-            params: {
-                apiKey: API_KEY,
-                pageSize,
-                page,
-            },
-        });
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching gaming news:', error);
+    res.status(500).json({ message: 'Failed to fetch gaming news' });
+  }
+});
+
+export default router;

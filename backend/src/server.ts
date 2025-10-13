@@ -1,6 +1,7 @@
 import { createServer } from './index.js';
 import { testConnection, initializeDatabase, db } from "./config/database";
 import gamesRouter from './routes/games.js';
+import newsRouter from './routes/news.js'; 
 
 // Main server startup function
 async function startServer() {
@@ -10,7 +11,6 @@ async function startServer() {
     console.error('Failed to connect to database. Please check your MySQL configuration.');
     process.exit(1);
   }
-
   // Create database tables if they don't exist
   await initializeDatabase();
 
@@ -18,7 +18,8 @@ async function startServer() {
   const app = createServer();
   const PORT = process.env.PORT || 3000;
 
-app.use('/api/games', gamesRouter);
+  app.use('/api/games', gamesRouter);
+  app.use('/api/news', newsRouter);
 
   // COMMUNITY ROUTES
   // Get all communities

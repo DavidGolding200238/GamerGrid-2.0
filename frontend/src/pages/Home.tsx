@@ -42,15 +42,17 @@ export default function Home(){
 		}
 	}, []);
 
-	const fetchNews = useCallback(async () => {
-		try {
-			// Use the dedicated newsApi service
-			const news = await newsApi.fetchGamingNews(6);
-			setNewsItems(news);
-		} catch(e) {
-			console.error('Failed to fetch news:', e);
-		}
-	}, []);
+const fetchNews = useCallback(async () => {
+  try {
+    // Use the dedicated newsApi service
+    const response = await newsApi.fetchGamingNews(6);
+    
+    // Extract the articles array from the response object
+    setNewsItems(response.articles);
+  } catch(e) {
+    console.error('Failed to fetch news:', e);
+  }
+}, []);
 
 	const fetchGames = useCallback(async ()=>{
 		setLoading(true); setError(null);

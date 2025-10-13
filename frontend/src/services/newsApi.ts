@@ -17,6 +17,7 @@ export interface NewsArticle {
     };
 }
 
+
 class NewsApiService {
     private static instance: NewsApiService;
 
@@ -27,15 +28,9 @@ class NewsApiService {
         return NewsApiService.instance;
     }
 
-    async fetchGamingNews(limit: number = 10): Promise<NewsArticle[]> {
+      async fetchGamingNews(limit: number = 12, page: number = 1) {
         try {
-            const response = await fetch(RAPID_API_URL, {
-                method: 'GET',
-                headers: {
-                    'X-RapidAPI-Key': RAPID_API_KEY,
-                    'X-RapidAPI-Host': RAPID_API_HOST
-                }
-            });
+            const response = await fetch(`/api/news/gaming?pageSize=${limit}&page=${page}`);
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -43,21 +38,24 @@ class NewsApiService {
 
             const data = await response.json();
             
-            // Transform the API response to match our NewsArticle interface
-            return data.slice(0, limit).map((item: any, index: number) => ({
-                id: item.id || index.toString(),
-                title: item.title || 'No title',
-                description: item.description || item.short_description || 'No description',
-                url: item.article_url || item.url || '#',
-                urlToImage: item.main_image || item.thumbnail || '',
-                publishedAt: item.publish_date || new Date().toISOString(),
-                content: item.article_content || item.description || '',
-                author: item.author || 'Unknown',
-                source: {
-                    id: 'mmo-games',
-                    name: item.source || 'MMO Games'
-                }
-            }));
+            // Return both the articles array and total results
+            return {
+                articles: data.articles.map((item: any) => ({
+                    id: item.url || Math.random().toString(), // Fallback ID if URL is missing
+                    title: item.title || 'No title',
+                    description: item.description || 'No description',
+                    url: item.url || '#',
+                    urlToImage: item.urlToImage || '',
+                    publishedAt: item.publishedAt || new Date().toISOString(),
+                    content: item.content || item.description || '',
+                    author: item.author || 'Unknown',
+                    source: {
+                        id: item.source?.id || '',
+                        name: item.source?.name || 'Unknown Source'
+                    }
+                })),
+                totalResults: data.totalResults || 0
+            };
         } catch (error) {
             console.error('Failed to fetch gaming news:', error);
             throw error;
@@ -65,4 +63,5 @@ class NewsApiService {
     }
 }
 
-export const newsApi = NewsApiService.getInstance()
+export const newsApi = NewsApiService.getInstance();
+
