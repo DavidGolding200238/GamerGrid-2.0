@@ -2,6 +2,7 @@ import { Header } from "../components/Header";
 import { useState, useEffect} from 'react';
 import {newsApi, NewsArticle} from "../services/newsApi";
 import { NetworkBackground } from "../components/NetworkBackground";
+import Footer from "../components/footer";
 
 export default function News() {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
@@ -45,6 +46,7 @@ export default function News() {
         <main className="max-w-7xl mx-auto px-6 lg:px-12 py-12">
           <p className="text-white text-center">Loading news articles...</p>
         </main>
+        <Footer />
       </div>
     );
   }
@@ -55,6 +57,12 @@ export default function News() {
       <Header />
       <main className="container mx-auto px-4 py-8 relative z-10"> 
         <h1 className="text-3xl font-bold mb-6">Gaming News</h1>
+
+        {error && (
+          <div className="bg-red-500/20 border border-red-500 text-red-100 px-6 py-4 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
 
         {loading && <div className="text-center my-4">Loading more articles...</div>}
 
@@ -129,6 +137,7 @@ export default function News() {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   );
 }

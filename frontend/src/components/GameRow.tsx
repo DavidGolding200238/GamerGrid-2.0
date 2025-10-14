@@ -61,8 +61,8 @@ export function GameRow({ games, title, onLoadMore, loading = false, hasMore = t
     
     return (
       <section className="mt-10 lg:mt-14 mb-24">
-        <h2 className="text-white font-montserrat text-2xl md:text-3xl lg:text-4xl font-bold tracking-wider text-center underline decoration-2 underline-offset-4 mb-12 lg:mb-16 uppercase relative z-30">
-          {title}
+        <h2 className="text-white font-montserrat text-2xl md:text-3xl font-bold tracking-wide flex items-center gap-3 mb-12 lg:mb-16">
+          {title} <span className="h-0.5 w-16 bg-accent rounded-full" />
         </h2>
         
         <div className="px-6 lg:px-12">
@@ -251,8 +251,8 @@ export function GameRow({ games, title, onLoadMore, loading = false, hasMore = t
 
   return (
     <section className="mb-20 relative z-20">
-      <h2 className="text-white font-montserrat text-2xl md:text-3xl lg:text-4xl font-bold tracking-wider text-center underline decoration-2 underline-offset-4 mb-12 lg:mb-16 uppercase relative z-30">
-        {title}
+      <h2 className="text-white font-montserrat text-2xl md:text-3xl font-bold tracking-wide flex items-center gap-3 mb-12 lg:mb-16">
+        {title} <span className="h-0.5 w-16 bg-accent rounded-full" />
       </h2>
 
       <div className="relative">

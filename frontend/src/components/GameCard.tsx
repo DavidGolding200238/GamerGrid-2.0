@@ -97,13 +97,12 @@ export function GameCard({ game, featured = false, className = "", onSelect }: G
           className={`relative z-10 font-monomaniac font-normal tracking-wide leading-snug line-clamp-2 text-white/90 drop-shadow-md ${featured ? 'text-sm sm:text-base md:text-lg' : 'text-[0.7rem] sm:text-xs md:text-sm'} 
           after:absolute after:left-0 after:-bottom-1 after:h-px after:w-0 group-hover:after:w-full after:bg-accent after:transition-all after:duration-500`}
         >{title}</h3>
-        <div className="flex flex-wrap gap-1 max-w-full">
+        <div className="flex flex-wrap gap-1.5 max-w-full">
           {genres.slice(0,3).map((g,i) => (
-            <span key={i} className="relative px-2 py-0.5 rounded-md bg-white/5 text-white/70 font-jost text-[0.55rem] sm:text-[0.6rem] font-medium tracking-wide ring-1 ring-white/10 backdrop-blur-[2px] 
-            group-hover:bg-white/10 group-hover:text-white transition-colors">{g}</span>
+            <span key={i} className="px-3 py-1 rounded-full bg-accent text-black font-jost text-[0.6rem] sm:text-xs font-medium tracking-wide">{g}</span>
           ))}
           {genres.length > 3 && (
-            <span className="px-2 py-0.5 rounded-md bg-white/5 text-white/60 font-jost text-[0.55rem] sm:text-[0.6rem] font-medium tracking-wide ring-1 ring-white/10">+{genres.length-3}</span>
+            <span className="px-3 py-1 rounded-full bg-accent/80 text-black font-jost text-[0.6rem] sm:text-xs font-medium tracking-wide">+{genres.length-3}</span>
           )}
         </div>
       </div>

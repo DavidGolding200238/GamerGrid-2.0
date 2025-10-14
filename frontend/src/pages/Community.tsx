@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Header } from "../components/Header";
+import Footer from '../components/footer';
 import { communityApi, Community as CommunityType, Post as PostType, CreateCommunityData, CreatePostData } from '../services/communityApi';
 import { NetworkBackground } from '../components/NetworkBackground';
 
@@ -341,6 +342,7 @@ export default function Community() {
               )}
             </div>
           </main>
+          <Footer />
         </div>
       </div>
     );
@@ -583,6 +585,7 @@ export default function Community() {
             </div>
           )}
         </main>
+        <Footer />
       </div>
     </div>
   );
