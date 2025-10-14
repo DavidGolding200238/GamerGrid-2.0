@@ -11,7 +11,7 @@ interface User {
   created_at: string;
 }
 
-export function Header() {
+export function Header({ variant = 'default' }: { variant?: 'default' | 'centeredLogo' }) {
   const [user, setUser] = useState<User | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
@@ -66,6 +66,34 @@ export function Header() {
       })}
     </ul>
   );
+
+  if (variant === 'centeredLogo') {
+    return (
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-black/55 supports-[backdrop-filter]:bg-black/40 border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
+          <div className="flex h-20 items-center justify-center">
+            <Link to="/" className="group flex items-center gap-2">
+              <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-game-grid-gradient-start to-game-grid-gradient-end shadow-inner shadow-black/50 flex items-center justify-center">
+                <span className="font-ethnocentric text-[0.55rem] tracking-wider text-white/90 leading-none">
+                  GG
+                </span>
+                <div className="absolute -inset-[2px] rounded-xl ring-1 ring-white/10 group-hover:ring-accent/40 transition" />
+              </div>
+              <div className="flex flex-col leading-tight select-none">
+                <span className="font-ethnocentric text-xs text-white/70 group-hover:text-white transition-colors">
+                  THE
+                </span>
+                <span className="font-ethnocentric text-base text-white group-hover:text-accent transition-colors">
+                  GAME GRID
+                </span>
+              </div>
+            </Link>
+          </div>
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 -bottom-px h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent opacity-70" />
+      </header>
+    );
+  }
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-md bg-black/55 supports-[backdrop-filter]:bg-black/40 border-b border-white/10">
