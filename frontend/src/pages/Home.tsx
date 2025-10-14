@@ -12,6 +12,10 @@ import Footer from '../components/footer';
 const imageFallback = '/assets/placeholders/game-placeholder.jpg';
 const newsFallback = '/assets/placeholders/news-placeholder.jpg';
 
+// Resolve backend-relative image URLs (e.g., /uploads/xyz.jpg) to absolute URLs
+const resolveImageUrl = (url?: string) =>
+  url ? (url.startsWith('http') ? url : `http://localhost:3000${url}`) : '';
+
 // Local fallback games to show if the API returns nothing
 const FALLBACK_GAMES: Game[] = [
   {
@@ -373,7 +377,7 @@ export default function Home() {
                           className="group relative rounded-2xl overflow-hidden bg-white/[0.04] border border-white/10 hover:border-accent/40 backdrop-blur-sm transition-colors"
                         >
                           <img
-                            src={checkImageUrl(c.image_url) ? c.image_url : imageFallback}
+                            src={c.image_url ? resolveImageUrl(c.image_url) : imageFallback}
                             alt={c.name}
                             className="absolute inset-0 w-full h-full object-cover opacity-75 group-hover:opacity-95"
                             onError={handleImageError}
