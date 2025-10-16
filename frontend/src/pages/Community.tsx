@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Header } from "../components/Header";
-import Footer from '../components/footer';
 import { communityApi, Community as CommunityType, Post as PostType, CreateCommunityData, CreatePostData } from '../services/communityApi';
 import { NetworkBackground } from '../components/NetworkBackground';
 
@@ -19,6 +18,13 @@ export default function Community() {
   const [showCreateCommunity, setShowCreateCommunity] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
 
+  // Auth check
+  const isAuthenticated = !!localStorage.getItem('accessToken');
+
+  // Membership state for selected community
+  const [isMember, setIsMember] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
+
   // Form states
   const [newCommunity, setNewCommunity] = useState<CreateCommunityData>({
     name: '',
@@ -30,11 +36,21 @@ export default function Community() {
   const [newPost, setNewPost] = useState<CreatePostData>({
     title: '',
     content: '',
-    image_url: '',
-    author: 'Anonymous'
+    image_url: ''
   });
 
+  // Full image modal state
+  const [fullImage, setFullImage] = useState<string | null>(null);
+
   const categories = ['All', 'FPS', 'RPG', 'Sandbox', 'Racing', 'Indie', 'Esports'];
+
+  // Update membership when community changes
+  useEffect(() => {
+    if (selectedCommunity) {
+      setIsMember(selectedCommunity.is_member || false);
+      setRole(selectedCommunity.role || null);
+    }
+  }, [selectedCommunity]);
 
   // Fetch communities on component mount
   useEffect(() => {
@@ -78,6 +94,7 @@ export default function Community() {
 
   const handleCreateCommunity = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAuthenticated) return setError('Please log in to create a community');
     if (!newCommunity.name.trim() || !newCommunity.description.trim()) return;
 
     try {
@@ -96,12 +113,13 @@ export default function Community() {
 
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCommunity || !newPost.title.trim() || !newPost.content.trim()) return;
+    if (!isAuthenticated || !selectedCommunity) return setError('Please log in and select a community');
+    if (!newPost.title.trim() || !newPost.content.trim()) return;
 
     try {
       setLoading(true);
       await communityApi.createPost(selectedCommunity.id, newPost);
-      setNewPost({ title: '', content: '', image_url: '', author: 'Anonymous' });
+      setNewPost({ title: '', content: '', image_url: '' });
       setShowCreatePost(false);
       await fetchPosts(selectedCommunity.id); // Refresh posts
       
@@ -117,6 +135,50 @@ export default function Community() {
       console.error('Error creating post:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle join community
+  const handleJoin = async () => {
+    if (!isAuthenticated) return setError('Please log in to join');
+    try {
+      await communityApi.joinCommunity(selectedCommunity!.id);
+      setIsMember(true);
+      setRole('member');
+      setSelectedCommunity(prev => prev ? { ...prev, member_count: prev.member_count + 1 } : null);
+    } catch (err) {
+      setError('Failed to join community');
+    }
+  };
+
+  // Handle leave community
+  const handleLeave = async () => {
+    try {
+      await communityApi.leaveCommunity(selectedCommunity!.id);
+      setIsMember(false);
+      setRole(null);
+      setSelectedCommunity(prev => prev ? { ...prev, member_count: prev.member_count - 1 } : null);
+    } catch (err) {
+      setError('Failed to leave community');
+    }
+  };
+
+  // Handle like/unlike post
+  const handleLike = async (postId: number, isLiked: boolean) => {
+    if (!isAuthenticated) return setError('Please log in to like posts');
+    try {
+      if (isLiked) {
+        await communityApi.unlikePost(postId);
+      } else {
+        await communityApi.likePost(postId);
+      }
+      setPosts(prev => prev.map(p => 
+        p.id === postId 
+          ? { ...p, is_liked: !isLiked, likes_count: isLiked ? p.likes_count - 1 : p.likes_count + 1 }
+          : p
+      ));
+    } catch (err) {
+      setError('Failed to toggle like');
     }
   };
 
@@ -191,24 +253,36 @@ export default function Community() {
                       <span className="bg-accent/20 text-accent px-3 py-1 rounded-full text-sm font-jost uppercase tracking-wide">
                         {selectedCommunity.category}
                       </span>
+                      {isMember && (
+                        <span className="bg-accent text-black px-3 py-1 rounded-full text-sm font-jost uppercase tracking-wide">
+                          Joined ({role})
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <button className="bg-accent text-black font-jost font-bold px-6 py-3 rounded-lg uppercase tracking-wider hover:bg-accent/90 transition-colors">
-                    Join Community
-                  </button>
+                  {isAuthenticated && (
+                    <button 
+                      onClick={isMember ? handleLeave : handleJoin}
+                      className="bg-accent text-black font-jost font-bold px-6 py-3 rounded-lg uppercase tracking-wider hover:bg-accent/90 transition-colors"
+                    >
+                      {isMember ? 'Leave Community' : 'Join Community'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Create Post Button */}
-            <div className="mb-8">
-              <button
-                onClick={() => setShowCreatePost(!showCreatePost)}
-                className="bg-accent text-black font-jost font-bold px-6 py-3 rounded-lg uppercase tracking-wider hover:bg-accent/90 transition-colors"
-              >
-                {showCreatePost ? 'Cancel' : 'Create New Post'}
-              </button>
-            </div>
+            {isAuthenticated && (
+              <div className="mb-8">
+                <button
+                  onClick={() => setShowCreatePost(!showCreatePost)}
+                  className="bg-accent text-black font-jost font-bold px-6 py-3 rounded-lg uppercase tracking-wider hover:bg-accent/90 transition-colors"
+                >
+                  {showCreatePost ? 'Cancel' : 'Create New Post'}
+                </button>
+              </div>
+            )}
 
             {/* Create Post Form */}
             {showCreatePost && (
@@ -233,20 +307,70 @@ export default function Community() {
                       required
                     />
                     <div className="flex gap-4">
-                      <input
-                        type="url"
-                        value={newPost.image_url || ''}
-                        onChange={(e) => setNewPost({...newPost, image_url: e.target.value})}
-                        placeholder="Image URL (optional)"
-                        className="flex-1 bg-black/40 border border-white/15 rounded-lg px-4 py-3 text-white placeholder-white/40 font-jost focus:outline-none focus:ring-2 focus:ring-accent/70 focus:border-accent/70 transition"
-                      />
-                      <input
-                        type="text"
-                        value={newPost.author || ''}
-                        onChange={(e) => setNewPost({...newPost, author: e.target.value})}
-                        placeholder="Your name (optional)"
-                        className="flex-1 bg-black/40 border border-white/15 rounded-lg px-4 py-3 text-white placeholder-white/40 font-jost focus:outline-none focus:ring-2 focus:ring-accent/70 focus:border-accent/70 transition"
-                      />
+                      <div className="flex-1">
+                        <label className="text-white/70 text-sm mb-2 block">Post Image (optional)</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                const file = e.target.files[0];
+                                const formData = new FormData();
+                                formData.append('image', file);
+                                
+                                setLoading(true);
+                                fetch('http://localhost:3000/api/upload', {
+                                  method: 'POST',
+                                  headers: isAuthenticated ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {},
+                                  body: formData,
+                                })
+                                  .then(res => res.json())
+                                  .then(data => {
+                                    setNewPost({...newPost, image_url: data.url});
+                                    setError(null);
+                                  })
+                                  .catch(err => {
+                                    console.error('Error uploading image:', err);
+                                    setError('Failed to upload image');
+                                  })
+                                  .finally(() => setLoading(false));
+                              }
+                            }}
+                            className="hidden" 
+                            id="postImageUpload"
+                          />
+                          <label 
+                            htmlFor="postImageUpload"
+                            className="flex-1 bg-black/40 border border-white/15 rounded-lg px-4 py-3 text-white/60 font-jost cursor-pointer hover:bg-black/50 transition flex items-center gap-2"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            {newPost.image_url ? 'Image selected' : 'Choose image...'}
+                          </label>
+                          {newPost.image_url && (
+                            <button
+                              type="button"
+                              onClick={() => setNewPost({...newPost, image_url: ''})}
+                              className="bg-red-500/20 hover:bg-red-500/30 text-red-100 p-3 rounded-lg transition"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                        {newPost.image_url && (
+                          <div className="mt-2 relative h-32 w-32 rounded-lg overflow-hidden border-2 border-white/20">
+                            <img 
+                              src={resolveImageUrl(newPost.image_url)}
+                              alt="Preview" 
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                      </div>
                       <button 
                         type="submit"
                         disabled={loading}
@@ -305,7 +429,8 @@ export default function Community() {
                           <img 
                             src={resolveImageUrl(post.image_url)} 
                             alt="Post content" 
-                            className="w-full h-64 object-cover"
+                            className="w-full h-64 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => setFullImage(resolveImageUrl(post.image_url))}
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
                             }}
@@ -315,12 +440,17 @@ export default function Community() {
 
                       {/* Post Actions */}
                       <div className="flex items-center gap-6 pt-4 border-t border-white/10">
-                        <button className="flex items-center gap-2 text-white/60 hover:text-accent transition-colors group">
-                          <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                          </svg>
-                          <span className="font-jost">{post.likes_count} likes</span>
-                        </button>
+                        {isAuthenticated && (
+                          <button 
+                            onClick={() => handleLike(post.id, post.is_liked || false)}
+                            className={`flex items-center gap-2 transition-colors group ${post.is_liked ? 'text-accent' : 'text-white/60 hover:text-accent'}`}
+                          >
+                            <svg className={`w-5 h-5 group-hover:scale-110 transition-transform ${post.is_liked ? 'fill-current' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                            </svg>
+                            <span className="font-jost">{post.likes_count} likes</span>
+                          </button>
+                        )}
                         
                         <button className="flex items-center gap-2 text-white/60 hover:text-accent transition-colors group">
                           <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -342,8 +472,22 @@ export default function Community() {
               )}
             </div>
           </main>
-          <Footer />
         </div>
+
+        {/* Full Image Modal */}
+        {fullImage && (
+          <div 
+            className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-pointer"
+            onClick={() => setFullImage(null)}
+          >
+            <img 
+              src={fullImage} 
+              alt="Full size" 
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -367,14 +511,16 @@ export default function Community() {
           </div>
 
           {/* Create Community Button */}
-          <div className="text-center mb-8">
-            <button
-              onClick={() => setShowCreateCommunity(!showCreateCommunity)}
-              className="bg-accent text-black font-jost font-bold px-8 py-4 rounded-lg uppercase tracking-wider hover:bg-accent/90 transition-colors"
-            >
-              {showCreateCommunity ? 'Cancel' : 'Create New Community'}
-            </button>
-          </div>
+          {isAuthenticated && (
+            <div className="text-center mb-8">
+              <button
+                onClick={() => setShowCreateCommunity(!showCreateCommunity)}
+                className="bg-accent text-black font-jost font-bold px-8 py-4 rounded-lg uppercase tracking-wider hover:bg-accent/90 transition-colors"
+              >
+                {showCreateCommunity ? 'Cancel' : 'Create New Community'}
+              </button>
+            </div>
+          )}
 
           {/* Create Community Form */}
           {showCreateCommunity && (
@@ -398,69 +544,91 @@ export default function Community() {
                     className="w-full bg-black/40 border border-white/15 rounded-lg px-4 py-3 text-white placeholder-white/40 font-jost focus:outline-none focus:ring-2 focus:ring-accent/70 focus:border-accent/70 transition resize-none"
                     required
                   />
-                <div className="flex flex-col gap-2">
-  <label className="text-white/70 text-sm">Community Image (optional)</label>
-  <div className="flex items-center gap-2">
-    <input
-      type="file"
-      accept="image/*"
-      onChange={(e) => {
-        if (e.target.files && e.target.files[0]) {
-          const file = e.target.files[0];
-          const formData = new FormData();
-          formData.append('image', file);
-          
-          setLoading(true);
-          fetch('http://localhost:3000/api/upload', {
-            method: 'POST',
-            body: formData,
-          })
-            .then(res => res.json())
-            .then(data => {
-              setNewCommunity({...newCommunity, image_url: data.url});
-              setError(null);
-            })
-            .catch(err => {
-              console.error('Error uploading image:', err);
-              setError('Failed to upload image');
-            })
-            .finally(() => setLoading(false));
-        }
-      }}
-      className="hidden" 
-      id="communityImageUpload"
-    />
-    <label 
-      htmlFor="communityImageUpload"
-      className="flex-1 bg-black/40 border border-white/15 rounded-lg px-4 py-3 text-white/60 font-jost cursor-pointer hover:bg-black/50 transition flex items-center gap-2"
-    >
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-      {newCommunity.image_url ? 'Image selected' : 'Choose image...'}
-    </label>
-    {newCommunity.image_url && (
-      <button
-        type="button"
-        onClick={() => setNewCommunity({...newCommunity, image_url: ''})}
-        className="bg-red-500/20 hover:bg-red-500/30 text-red-100 p-3 rounded-lg transition"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    )}
-  </div>
-  {newCommunity.image_url && (
-    <div className="mt-2 relative h-32 w-32 rounded-lg overflow-hidden border-2 border-white/20">
-      <img 
-        src={resolveImageUrl(newCommunity.image_url)}
-        alt="Preview" 
-        className="w-full h-full object-cover"
-      />
-    </div>
-  )}
-</div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-white/70 text-sm">Category</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {['FPS', 'RPG', 'Sandbox', 'Racing', 'Indie', 'Esports'].map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setNewCommunity({...newCommunity, category: cat})}
+                          className={`px-4 py-2 rounded-lg font-jost font-medium transition-all duration-300 ${
+                            newCommunity.category === cat
+                              ? 'bg-accent text-black'
+                              : 'bg-white/10 text-white/70 hover:bg-white/20'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-white/70 text-sm">Community Image (optional)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const file = e.target.files[0];
+                            const formData = new FormData();
+                            formData.append('image', file);
+                            
+                            setLoading(true);
+                            fetch('http://localhost:3000/api/upload', {
+                              method: 'POST',
+                              headers: isAuthenticated ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {},
+                              body: formData,
+                            })
+                              .then(res => res.json())
+                              .then(data => {
+                                setNewCommunity({...newCommunity, image_url: data.url});
+                                setError(null);
+                              })
+                              .catch(err => {
+                                console.error('Error uploading image:', err);
+                                setError('Failed to upload image');
+                              })
+                              .finally(() => setLoading(false));
+                          }
+                        }}
+                        className="hidden" 
+                        id="communityImageUpload"
+                      />
+                      <label 
+                        htmlFor="communityImageUpload"
+                        className="flex-1 bg-black/40 border border-white/15 rounded-lg px-4 py-3 text-white/60 font-jost cursor-pointer hover:bg-black/50 transition flex items-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        {newCommunity.image_url ? 'Image selected' : 'Choose image...'}
+                      </label>
+                      {newCommunity.image_url && (
+                        <button
+                          type="button"
+                          onClick={() => setNewCommunity({...newCommunity, image_url: ''})}
+                          className="bg-red-500/20 hover:bg-red-500/30 text-red-100 p-3 rounded-lg transition"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    {newCommunity.image_url && (
+                      <div className="mt-2 relative h-32 w-32 rounded-lg overflow-hidden border-2 border-white/20">
+                        <img 
+                          src={resolveImageUrl(newCommunity.image_url)}
+                          alt="Preview" 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
                   <button 
                     type="submit"
                     disabled={loading}
@@ -553,6 +721,13 @@ export default function Community() {
                         {community.category}
                       </span>
                     </div>
+                    {community.is_member && (
+                      <div className="absolute top-4 right-4">
+                        <span className="bg-accent text-black px-3 py-1 rounded-full text-sm font-jost font-bold uppercase tracking-wide">
+                          Joined ({community.role})
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Community Info */}
@@ -585,7 +760,6 @@ export default function Community() {
             </div>
           )}
         </main>
-        <Footer />
       </div>
     </div>
   );

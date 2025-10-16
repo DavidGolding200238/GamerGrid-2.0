@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'https://gamergrid-backend-env-1.eba-kguacsz8.us-east-1.elasticbeanstalk.com/api';
 
 export interface User {
   id: number;

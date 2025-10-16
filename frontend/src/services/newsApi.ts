@@ -1,7 +1,3 @@
-const RAPID_API_URL = 'https://mmo-games.p.rapidapi.com/latestnews';
-const RAPID_API_KEY = '1435a946f8msh6f48b802001f9bap184306jsn3db9537b6580';
-const RAPID_API_HOST = 'mmo-games.p.rapidapi.com';
-
 export interface NewsArticle {
     id: string;
     title: string;
@@ -15,6 +11,11 @@ export interface NewsArticle {
         id?: string;
         name: string;
     };
+}
+
+interface NewsResponse {
+    articles: any[];
+    totalResults: number;
 }
 
 
@@ -36,7 +37,7 @@ class NewsApiService {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const data = await response.json();
+            const data = await response.json() as NewsResponse;
             
             // Return both the articles array and total results
             return {

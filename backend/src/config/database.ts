@@ -105,6 +105,33 @@ export async function initializeDatabase() {
       )
     `);
 
+    // Add community membership table
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS community_members (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        community_id INT NOT NULL,
+        role ENUM('member', 'admin') DEFAULT 'member',
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_user_community (user_id, community_id)
+      )
+    `);
+
+    // Add post likes table
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS post_likes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        post_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_user_post (user_id, post_id)
+      )
+    `);
+
     console.log('✅ Database tables initialized successfully');
     connection.release();
     return true;

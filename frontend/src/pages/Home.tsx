@@ -182,6 +182,8 @@ export default function Home() {
     }
   }, []);
 
+  
+
   useEffect(() => {
     fetchGames();
     fetchCommunities();

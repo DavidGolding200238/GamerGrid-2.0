@@ -2,17 +2,12 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import multer from "multer";
-import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
-import { getRandomGames, getTopGames, getGamesByGenre } from "./routes/games";
-import { registerUser, loginUser, getUserProfile, logoutUser } from "./routes/auth";
-import { authenticateToken } from "./middleware/auth";
-import { db } from "./config/database";
-
-// ESM-safe __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getRandomGames, getTopGames, getGamesByGenre } from "./routes/games.js";
+import { registerUser, loginUser, getUserProfile, logoutUser } from "./routes/auth.js";
+import { authenticateToken } from "./middleware/auth.js";
+import { db } from "./config/database.js";
 
 export function createServer() {
   const app = express();
@@ -22,25 +17,16 @@ export function createServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // Root route
+  app.get('/', (_req, res) => {
+    res.status(200).send('GamerGrid backend is running');
+  });
+
   // Test API
   app.get("/api/ping", (_req, res) => res.json({ message: "ping" }));
 
-  // Ensure uploads dir exists
-  const uploadDir = path.resolve(__dirname, "../../uploads");
-  if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-  // Serve uploaded files
-  app.use("/uploads", express.static(uploadDir));
-
-  // Multer storage
-  const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      const base = path.basename(file.originalname, ext).replace(/\s+/g, "_");
-      cb(null, `${base}-${Date.now()}${ext}`);
-    },
-  });
+  // Multer storage (memory for S3 upload)
+  const storage = multer.memoryStorage();
 
   const upload = multer({
     storage,
@@ -51,10 +37,27 @@ export function createServer() {
     },
   });
 
-  // Upload endpoint (returns URL to store in DB)
-  app.post("/api/upload", upload.single("image"), (req, res) => {
+  // S3 client
+  const s3 = new S3Client({ region: process.env.AWS_REGION });
+
+  // Upload endpoint (uploads to S3 and returns URL)
+  app.post("/api/upload", upload.single("image"), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    return res.json({ url: `/uploads/${req.file.filename}` });
+    const ext = path.extname(req.file.originalname);
+    const base = path.basename(req.file.originalname, ext).replace(/\s+/g, "_");
+    const key = `uploads/${base}-${Date.now()}${ext}`;
+    try {
+      await s3.send(new PutObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: key,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype,
+      }));
+      return res.json({ url: `https://${process.env.S3_BUCKET_NAME}.s3.amazonaws.com/${key}` });
+    } catch (error) {
+      console.error("S3 upload error:", error);
+      return res.status(500).json({ error: "Failed to upload file" });
+    }
   });
 
   // Auth routes

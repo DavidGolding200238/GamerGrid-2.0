@@ -18,7 +18,7 @@ interface NewsItem {
 }
 
 // Configuration - Update these with your actual API details
-const API_BASE_URL = import.meta.env.VITE_GAME_API_URL || '/api';
+const API_BASE_URL = 'https://gamergrid-backend-env-1.eba-kguacsz8.us-east-1.elasticbeanstalk.com/api';
 
 interface ApiResponse<T> {
   data: T;
