@@ -6,6 +6,7 @@ export interface Community {
   description: string;
   category: string;
   image_url?: string;
+  banner_image_url?: string;
   member_count: number;
   post_count: number;
   created_at: string;
@@ -26,16 +27,36 @@ export interface Post {
   is_liked?: boolean;
 }
 
+export interface CreatePostData {
+  title: string;
+  content: string;
+  image_url?: string;
+}
+
 export interface CreateCommunityData {
   name: string;
   description: string;
   category: string;
   image_url?: string;
+  banner_image_url?: string;
 }
 
-export interface CreatePostData {
-  title: string;
+export interface Comment {
+  id: number;
+  post_id: number;
+  parent_comment_id: number | null;
+  user_id: number | null;
   content: string;
+  image_url?: string;
+  author: string;
+  likes_count: number;
+  created_at: string;
+  is_liked?: boolean;
+}
+
+export interface CreateCommentData {
+  content: string;
+  parent_comment_id?: number;
   image_url?: string;
 }
 
@@ -215,6 +236,96 @@ export const communityApi = {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || 'Failed to unlike post');
+    }
+    return response.json();
+  },
+
+  // Get comments for a post
+  async getPostComments(communityId: number, postId: number, limit: number = 5, offset: number = 0): Promise<{ comments: Comment[], hasMore: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts/${postId}/comments?limit=${limit}&offset=${offset}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to fetch comments');
+    }
+    const data = await response.json();
+    if (!data.comments || !Array.isArray(data.comments)) {
+      throw new Error('Invalid response structure for comments');
+    }
+    return { comments: data.comments, hasMore: data.hasMore || false };
+  },
+
+  // Create comment on a post or reply to a comment (auth required)
+  async createComment(communityId: number, postId: number, commentData: CreateCommentData): Promise<{ id: number; message: string }> {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('User is not authenticated');
+
+    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts/${postId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(commentData),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to create comment');
+    }
+    return response.json();
+  },
+
+  // Unlike a comment (auth required)
+  async unlikeComment(communityId: number, postId: number, commentId: number): Promise<{ message: string }> {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('User is not authenticated');
+
+    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts/${postId}/comments/${commentId}/like`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to unlike comment');
+    }
+    return response.json();
+  },
+
+  // Like a comment (auth required)
+  async likeComment(communityId: number, postId: number, commentId: number): Promise<{ message: string }> {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('User is not authenticated');
+
+    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts/${postId}/comments/${commentId}/like`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to like comment');
+    }
+    return response.json();
+  },
+
+  // Delete a comment (admin only)
+  async deleteComment(communityId: number, postId: number, commentId: number): Promise<{ message: string }> {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('User is not authenticated');
+
+    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts/${postId}/comments/${commentId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to delete comment');
     }
     return response.json();
   }

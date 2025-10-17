@@ -3,9 +3,9 @@ import { Game } from '../../../shared/api';
 
 // Define these locally since they are not exported from gameApi
 const imageFallback = 'https://placehold.co/600x400/222222/cccccc?text=No+Image';
-const RAWG_API_KEY = 'c60ed11f699e430485308b3a910b1cb7'; // Use your actual RAWG API key
+const RAWG_API_KEY = import.meta.env.VITE_RAWG_API_KEY || 'c60ed11f699e430485308b3a910b1cb7'; // Use your actual RAWG API key
 const withKey = (endpoint: string, params: Record<string, any> = {}) => {
-  const url = new URL(`https://api.rawg.io/api${endpoint}`);
+  const url = new URL(`${import.meta.env.VITE_RAWG_API_BASE || 'https://api.rawg.io/api'}${endpoint}`);
   url.searchParams.append('key', RAWG_API_KEY);
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) {
@@ -75,7 +75,7 @@ export function GameDetailOverlay({ game, onClose }: GameDetailOverlayProps) {
         name: `${pick(adjectives)} ${topic} ${pick(suffixes)}`.replace(/\s+/g,' ').trim(),
         members: Math.floor(800 + Math.random()*25000),
         tagline: `All about ${topic}`,
-        image: `https://picsum.photos/seed/${encodeURIComponent(topic)}-${i}/400/400`
+        image: import.meta.env[`VITE_DETAIL_COMMUNITY_IMAGE_${i+1}`] || `https://picsum.photos/seed/${encodeURIComponent(topic)}-${i}/400/400` // TODO: Make configurable
       };
     });
   }, [details, game?.title]);

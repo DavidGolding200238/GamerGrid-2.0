@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { authService } from "../services/authService";
+import { Header } from "../components/Header";
 
 // Sign Up Page Component - User Registration Form
 export default function SignUp() {
@@ -51,30 +52,7 @@ export default function SignUp() {
   };
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Header with Logo */}
-      <header className="bg-game-grid-header shadow-[0_-1px_37px_0_rgba(129,129,129,0.25)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
-          <div className="flex items-center justify-between h-20 lg:h-24">
-            {/* Logo */}
-            <Link to="/" className="flex flex-col items-center">
-              <h1 className="text-white font-ethnocentric text-lg lg:text-2xl font-light leading-tight">
-                THE
-              </h1>
-              <h2 className="text-white font-ethnocentric text-lg lg:text-2xl font-light leading-tight">
-                GAME GRID
-              </h2>
-            </Link>
-            
-            {/* Back to Sign In */}
-            <Link 
-              to="/signin"
-              className="text-white font-jost font-bold text-sm lg:text-base uppercase tracking-wider hover:text-accent transition-colors"
-            >
-              Sign In
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Header variant="centeredLogo" />
 
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">

@@ -55,6 +55,10 @@ export async function initializeDatabase() {
         password_hash VARCHAR(255) NOT NULL,
         display_name VARCHAR(100),
         profile_image VARCHAR(255),
+        is_verified BOOLEAN DEFAULT FALSE,
+        verification_token VARCHAR(255),
+        reset_token VARCHAR(255),
+        reset_expires DATETIME,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
@@ -84,6 +88,7 @@ export async function initializeDatabase() {
         description TEXT NOT NULL,
         category VARCHAR(50) NOT NULL,
         image_url VARCHAR(500),
+        banner_image_url VARCHAR(500),
         member_count INT DEFAULT 0,
         post_count INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -121,14 +126,41 @@ export async function initializeDatabase() {
 
     // Add post likes table
     await connection.execute(`
-      CREATE TABLE IF NOT EXISTS post_likes (
+      CREATE TABLE IF NOT EXISTS community_comments (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
         post_id INT NOT NULL,
+        parent_comment_id INT DEFAULT NULL,
+        user_id INT,
+        content TEXT NOT NULL,
+        image_url VARCHAR(500),
+        author VARCHAR(100) DEFAULT 'Anonymous',
+        likes_count INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE,
-        UNIQUE KEY unique_user_post (user_id, post_id)
+        FOREIGN KEY (parent_comment_id) REFERENCES community_comments(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Add missing columns if not exist
+    try {
+      await connection.execute(`ALTER TABLE community_comments ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)`);
+      await connection.execute(`ALTER TABLE community_comments ADD COLUMN IF NOT EXISTS likes_count INT DEFAULT 0`);
+      await connection.execute(`ALTER TABLE communities ADD COLUMN IF NOT EXISTS banner_image_url VARCHAR(500)`);
+    } catch (alterError) {
+      console.log('Columns may already exist or alter failed:', (alterError as Error).message);
+    }
+
+    // Add comment likes table
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS community_comment_likes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        comment_id INT NOT NULL,
+        user_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (comment_id) REFERENCES community_comments(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_user_comment_like (user_id, comment_id)
       )
     `);
 

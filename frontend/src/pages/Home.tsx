@@ -14,14 +14,14 @@ const newsFallback = '/assets/placeholders/news-placeholder.jpg';
 
 // Resolve backend-relative image URLs (e.g., /uploads/xyz.jpg) to absolute URLs
 const resolveImageUrl = (url?: string) =>
-  url ? (url.startsWith('http') ? url : `http://localhost:3000${url}`) : '';
+  url ? (url.startsWith('http') ? url : `${import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, '') || ''}${url}`) : '';
 
 // Local fallback games to show if the API returns nothing
 const FALLBACK_GAMES: Game[] = [
   {
     id: '3498',
     title: 'Grand Theft Auto V',
-    image: 'https://media.rawg.io/media/games/456/456dea5e1c7e3cd07060c14e96612001.jpg',
+    image: import.meta.env.VITE_GAME_IMAGE_1 || 'https://media.rawg.io/media/games/456/456dea5e1c7e3cd07060c14e96612001.jpg', // TODO: Make configurable
     genres: ['Action', 'Adventure'],
     platform: ['PC', 'PlayStation', 'Xbox'],
     rating: 4.47,
@@ -29,7 +29,7 @@ const FALLBACK_GAMES: Game[] = [
   {
     id: '3328',
     title: 'The Witcher 3: Wild Hunt',
-    image: 'https://media.rawg.io/media/games/618/618c2031a07bbff6b4f611f10b6bcdbc.jpg',
+    image: import.meta.env.VITE_GAME_IMAGE_2 || 'https://media.rawg.io/media/games/618/618c2031a07bbff6b4f611f10b6bcdbc.jpg',
     genres: ['Action', 'Adventure', 'RPG'],
     platform: ['PC', 'PlayStation', 'Xbox', 'Nintendo Switch'],
     rating: 4.66,
@@ -37,7 +37,7 @@ const FALLBACK_GAMES: Game[] = [
   {
     id: '4200',
     title: 'Portal 2',
-    image: 'https://media.rawg.io/media/games/328/3283617cb7d75d67257fc58339188742.jpg',
+    image: import.meta.env.VITE_GAME_IMAGE_3 || 'https://media.rawg.io/media/games/328/3283617cb7d75d67257fc58339188742.jpg',
     genres: ['Shooter', 'Puzzle'],
     platform: ['PC', 'PlayStation', 'Xbox'],
     rating: 4.62,
@@ -45,7 +45,7 @@ const FALLBACK_GAMES: Game[] = [
   {
     id: '5286',
     title: 'Tomb Raider (2013)',
-    image: 'https://media.rawg.io/media/games/021/021c4e21a1824d2526f925eff6324653.jpg',
+    image: import.meta.env.VITE_GAME_IMAGE_4 || 'https://media.rawg.io/media/games/021/021c4e21a1824d2526f925eff6324653.jpg',
     genres: ['Action', 'Adventure'],
     platform: ['PC', 'PlayStation', 'Xbox'],
     rating: 4.05,
@@ -53,7 +53,7 @@ const FALLBACK_GAMES: Game[] = [
   {
     id: '4291',
     title: 'Counter-Strike: Global Offensive',
-    image: 'https://media.rawg.io/media/games/736/73619bd336c894d6941d926bfd563946.jpg',
+    image: import.meta.env.VITE_GAME_IMAGE_5 || 'https://media.rawg.io/media/games/736/73619bd336c894d6941d926bfd563946.jpg',
     genres: ['Action', 'Shooter'],
     platform: ['PC', 'PlayStation', 'Xbox'],
     rating: 3.57,
@@ -66,7 +66,7 @@ export default function Home() {
   const [newsItems, setNewsItems] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mixSeed, setMixSeed] = useState(0);
+  // mixSeed removed — shuffle button was removed from the UI
 
   // Debug function to check image URLs
   const checkImageUrl = (url: string | undefined) => {
@@ -195,11 +195,8 @@ export default function Home() {
 
   const topCommunities = useMemo(() => {
     if (!communities.length) return [];
-    const ordered = [...communities].sort((a, b) => b.member_count - a.member_count);
-    if (!mixSeed) return ordered.slice(0, 12);
-    const offset = mixSeed % ordered.length;
-    return ordered.slice(offset).concat(ordered.slice(0, offset)).slice(0, 12);
-  }, [communities, mixSeed]);
+    return [...communities].sort((a, b) => b.member_count - a.member_count).slice(0, 12);
+  }, [communities]);
 
   const sidebarNews = useMemo(() => newsItems.slice(0, 8), [newsItems]);
 
@@ -244,12 +241,7 @@ export default function Home() {
               >
                 {loading ? 'Refreshing…' : 'Refresh Data'}
               </button>
-              <button
-                onClick={() => setMixSeed((s) => s + 1)}
-                className="px-5 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-accent/40 text-white/80 hover:text-white text-xs sm:text-sm font-semibold tracking-wide backdrop-blur-sm transition"
-              >
-                Shuffle Communities
-              </button>
+              {/* Shuffle Communities button removed per request */}
               <Link
                 to="/games"
                 className="px-5 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-accent/40 text-white/80 hover:text-white text-xs sm:text-sm font-semibold tracking-wide backdrop-blur-sm transition"

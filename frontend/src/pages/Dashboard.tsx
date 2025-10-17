@@ -28,20 +28,20 @@ type Tile = (
 const mockGames: Game[] = Array.from({ length: 12 }).map((_, i) => ({
   id: 'g' + i,
   title: 'Sample Game ' + (i + 1),
-  image: `https://picsum.photos/seed/game${i}/600/800`,
+  image: import.meta.env[`VITE_DASHBOARD_GAME_IMAGE_${i+1}`] || `https://picsum.photos/seed/game${i}/600/800`, // TODO: Make configurable
   genres: ['Action','Indie','RPG'].slice(0, (i % 3) + 1),
   platform: ['PC','PS5','Xbox'].slice(0, (i % 2) + 1),
   rating: 3.5 + (i % 5) * 0.5,
 }));
 const mockCommunities: CommunityItem[] = [
-  { id: 'c1', name: 'Speedrunners Hub', members: 12450, tagline: 'Frames matter.', image: 'https://picsum.photos/seed/comm1/500/500' },
-  { id: 'c2', name: 'Indie Forge', members: 8421, tagline: 'Build. Share. Iterate.', image: 'https://picsum.photos/seed/comm2/500/500' },
-  { id: 'c3', name: 'Tactical Minds', members: 6312, tagline: 'Every move counts.', image: 'https://picsum.photos/seed/comm3/500/500' },
+  { id: 'c1', name: 'Speedrunners Hub', members: 12450, tagline: 'Frames matter.', image: import.meta.env.VITE_DASHBOARD_COMMUNITY_IMAGE_1 || 'https://picsum.photos/seed/comm1/500/500' },
+  { id: 'c2', name: 'Indie Forge', members: 8421, tagline: 'Build. Share. Iterate.', image: import.meta.env.VITE_DASHBOARD_COMMUNITY_IMAGE_2 || 'https://picsum.photos/seed/comm2/500/500' },
+  { id: 'c3', name: 'Tactical Minds', members: 6312, tagline: 'Every move counts.', image: import.meta.env.VITE_DASHBOARD_COMMUNITY_IMAGE_3 || 'https://picsum.photos/seed/comm3/500/500' },
 ];
 const mockNews: NewsItem[] = [
-  { id: 'n1', title: 'Major Studio Announces Surprise Title', source: 'GameWire', image: 'https://picsum.photos/seed/news1/800/500', published: '2025-08-09' },
-  { id: 'n2', title: 'Indie Breakout Smashes Charts Globally', source: 'IndiePulse', image: 'https://picsum.photos/seed/news2/800/500', published: '2025-08-08' },
-  { id: 'n3', title: 'Competitive Finals Set New Viewership Record', source: 'eSportsCentral', image: 'https://picsum.photos/seed/news3/800/500', published: '2025-08-07' },
+  { id: 'n1', title: 'Major Studio Announces Surprise Title', source: 'GameWire', image: import.meta.env.VITE_DASHBOARD_NEWS_IMAGE_1 || 'https://picsum.photos/seed/news1/800/500', published: '2025-08-09' },
+  { id: 'n2', title: 'Indie Breakout Smashes Charts Globally', source: 'IndiePulse', image: import.meta.env.VITE_DASHBOARD_NEWS_IMAGE_2 || 'https://picsum.photos/seed/news2/800/500', published: '2025-08-08' },
+  { id: 'n3', title: 'Competitive Finals Set New Viewership Record', source: 'eSportsCentral', image: import.meta.env.VITE_DASHBOARD_NEWS_IMAGE_3 || 'https://picsum.photos/seed/news3/800/500', published: '2025-08-07' },
 ];
 
 export default function Dashboard() {

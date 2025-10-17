@@ -9,7 +9,7 @@ router.get("/communities", optionalAuth, async (req, res) => {
   try {
     const userId = req.userId;
     let query = `
-      SELECT id, name, description, category, image_url, member_count, post_count, created_at
+      SELECT id, name, description, category, image_url, banner_image_url, member_count, post_count, created_at
       FROM communities
       ORDER BY created_at DESC
     `;
@@ -41,7 +41,7 @@ router.get("/communities/:id", optionalAuth, async (req, res) => {
     const userId = req.userId;
 
     const [communities] = await db.execute(
-      'SELECT id, name, description, category, image_url, member_count, post_count, created_at FROM communities WHERE id = ?',
+      'SELECT id, name, description, category, image_url, banner_image_url, member_count, post_count, created_at FROM communities WHERE id = ?',
       [id]
     );
 
@@ -71,7 +71,7 @@ router.get("/communities/:id", optionalAuth, async (req, res) => {
 // Create community (auth required)
 router.post("/communities", authenticateToken, async (req, res) => {
   try {
-    const { name, description, category, image_url } = req.body;
+    const { name, description, category, image_url, banner_image_url } = req.body;
     const userId = req.userId;
 
     console.log('userId:', userId);  // Debug log
@@ -82,8 +82,8 @@ router.post("/communities", authenticateToken, async (req, res) => {
     }
 
     const [result] = await db.execute(
-      'INSERT INTO communities (name, description, category, image_url, owner_id) VALUES (?, ?, ?, ?, ?)',
-      [name, description, category, image_url || null, userId]
+      'INSERT INTO communities (name, description, category, image_url, banner_image_url) VALUES (?, ?, ?, ?, ?)',
+      [name, description, category, image_url || null, banner_image_url || null]
     );
     const communityId = (result as any).insertId;
 
@@ -179,7 +179,7 @@ router.delete("/communities/:id/join", authenticateToken, async (req, res) => {
 router.get("/communities/:id/posts", optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.userId;
+    // const userId = req.userId;
 
     const [posts] = await db.execute(
       'SELECT id, community_id, user_id, title, content, image_url, author, likes_count, comments_count, created_at FROM community_posts WHERE community_id = ? ORDER BY created_at DESC',
@@ -187,15 +187,15 @@ router.get("/communities/:id/posts", optionalAuth, async (req, res) => {
     );
 
     // Add is_liked flag if authenticated
-    if (userId) {
-      for (const post of posts as any[]) {
-        const [likes] = await db.execute(
-          'SELECT id FROM post_likes WHERE user_id = ? AND post_id = ?',
-          [userId, post.id]
-        );
-        post.is_liked = (likes as any[]).length > 0;
-      }
-    }
+    // if (userId) {
+    //   for (const post of posts as any[]) {
+    //     const [likes] = await db.execute(
+    //       'SELECT id FROM post_likes WHERE user_id = ? AND post_id = ?',
+    //       [userId, post.id]
+    //     );
+    //     post.is_liked = (likes as any[]).length > 0;
+    //   }
+    // }
 
     res.json({ posts });
   } catch (error) {
@@ -340,6 +340,214 @@ router.delete("/posts/:postId/like", authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error unliking post:', error);
     res.status(500).json({ error: 'Failed to unlike post' });
+  }
+});
+
+// Get comments for a post
+router.get("/communities/:id/posts/:postId/comments", async (req, res) => {
+  console.log('GET comments route called for postId:', req.params.postId);
+  try {
+    const { postId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 5;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const userId = req.userId; // May be undefined if not authenticated
+
+    let query = `
+      SELECT id, post_id, parent_comment_id, user_id, content, image_url, author, likes_count, created_at
+      FROM community_comments 
+      WHERE post_id = ? 
+      ORDER BY created_at ASC 
+      LIMIT ? OFFSET ?
+    `;
+    let params = [postId, limit + 1, offset];
+
+    const [comments] = await db.execute(query, params);
+
+    const commentsArray = comments as any[];
+    
+    // Add is_liked field if user is authenticated
+    if (userId) {
+      for (const comment of commentsArray) {
+        const [liked] = await db.execute(
+          'SELECT id FROM community_comment_likes WHERE comment_id = ? AND user_id = ?',
+          [comment.id, userId]
+        );
+        comment.is_liked = (liked as any[]).length > 0;
+      }
+    } else {
+      // Set is_liked to false for all comments if not authenticated
+      commentsArray.forEach(comment => comment.is_liked = false);
+    }
+
+    const hasMore = commentsArray.length > limit;
+    const commentsToReturn = hasMore ? commentsArray.slice(0, limit) : commentsArray;
+
+    console.log('Comments fetched:', commentsToReturn.length, 'hasMore:', hasMore);
+    res.json({ comments: commentsToReturn, hasMore });
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+// Create comment on a post (auth required)
+router.post("/communities/:id/posts/:postId/comments", authenticateToken, async (req, res) => {
+  console.log('POST comment route called');
+  try {
+    const { postId } = req.params;
+    const { content, parent_comment_id, image_url } = req.body;
+    const userId = req.userId;
+
+    console.log('postId:', postId, 'content:', content, 'parent_comment_id:', parent_comment_id, 'userId:', userId);
+
+    if (!content) {
+      return res.status(400).json({ error: 'Content is required' });
+    }
+
+    // Get user info for author name
+    let authorName = 'Anonymous';
+    try {
+      const [userRows] = await db.execute(
+        'SELECT username, display_name FROM users WHERE id = ?',
+        [userId]
+      );
+      const user = (userRows as any[])[0];
+      authorName = user?.display_name || user?.username || 'Anonymous';
+    } catch (dbError) {
+      console.error('Database query error:', dbError);
+      authorName = 'Anonymous';
+    }
+
+    const [result] = await db.execute(
+      'INSERT INTO community_comments (post_id, parent_comment_id, user_id, content, image_url, author) VALUES (?, ?, ?, ?, ?, ?)',
+      [postId, parent_comment_id || null, userId, content, image_url || null, authorName]
+    );
+
+    const commentId = (result as any).insertId;
+
+    // Update comments count
+    await db.execute(
+      'UPDATE community_posts SET comments_count = comments_count + 1 WHERE id = ?',
+      [postId]
+    );
+
+    res.status(201).json({ id: commentId, message: 'Comment created successfully' });
+  } catch (error) {
+    console.error('Error creating comment:', error);
+    res.status(500).json({ error: 'Failed to create comment' });
+  }
+});
+
+// Like a comment
+router.post("/communities/:id/posts/:postId/comments/:commentId/like", authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const userId = req.userId;
+
+    // Check if already liked
+    const [existing] = await db.execute(
+      'SELECT id FROM community_comment_likes WHERE comment_id = ? AND user_id = ?',
+      [commentId, userId]
+    );
+
+    if ((existing as any[]).length > 0) {
+      return res.status(400).json({ error: 'Already liked' });
+    }
+
+    // Insert like
+    await db.execute(
+      'INSERT INTO community_comment_likes (comment_id, user_id) VALUES (?, ?)',
+      [commentId, userId]
+    );
+
+    // Increment likes_count
+    await db.execute(
+      'UPDATE community_comments SET likes_count = likes_count + 1 WHERE id = ?',
+      [commentId]
+    );
+
+    res.status(200).json({ message: 'Comment liked' });
+  } catch (error) {
+    console.error('Error liking comment:', error);
+    res.status(500).json({ error: 'Failed to like comment' });
+  }
+});
+
+// Unlike a comment
+router.delete("/communities/:id/posts/:postId/comments/:commentId/like", authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const userId = req.userId;
+
+    // Delete like
+    const [result] = await db.execute(
+      'DELETE FROM community_comment_likes WHERE comment_id = ? AND user_id = ?',
+      [commentId, userId]
+    );
+
+    if ((result as any).affectedRows === 0) {
+      return res.status(400).json({ error: 'Not liked' });
+    }
+
+    // Decrement likes_count
+    await db.execute(
+      'UPDATE community_comments SET likes_count = likes_count - 1 WHERE id = ?',
+      [commentId]
+    );
+
+    res.status(200).json({ message: 'Comment unliked' });
+  } catch (error) {
+    console.error('Error unliking comment:', error);
+    res.status(500).json({ error: 'Failed to unlike comment' });
+  }
+});
+
+// Delete a comment (admin only)
+router.delete("/communities/:id/posts/:postId/comments/:commentId", authenticateToken, async (req, res) => {
+  try {
+    const { id: communityId, commentId } = req.params;
+    const userId = req.userId;
+
+    // Check if user is admin of the community
+    const [adminCheck] = await db.execute(
+      'SELECT role FROM community_members WHERE user_id = ? AND community_id = ? AND role = ?',
+      [userId, communityId, 'admin']
+    );
+
+    if ((adminCheck as any[]).length === 0) {
+      return res.status(403).json({ error: 'Only community admins can delete comments' });
+    }
+
+    // Check if comment exists and belongs to a post in this community
+    const [commentCheck] = await db.execute(
+      'SELECT c.id, p.community_id FROM community_comments c JOIN community_posts p ON c.post_id = p.id WHERE c.id = ? AND p.community_id = ?',
+      [commentId, communityId]
+    );
+
+    if ((commentCheck as any[]).length === 0) {
+      return res.status(404).json({ error: 'Comment not found in this community' });
+    }
+
+    // Delete comment likes first (due to foreign key constraint)
+    await db.execute('DELETE FROM community_comment_likes WHERE comment_id = ?', [commentId]);
+
+    // Delete the comment
+    const [result] = await db.execute('DELETE FROM community_comments WHERE id = ?', [commentId]);
+
+    if ((result as any).affectedRows === 0) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    // Update comments count on the post
+    await db.execute(
+      'UPDATE community_posts SET comments_count = comments_count - 1 WHERE id = (SELECT post_id FROM community_comments WHERE id = ?)',
+      [commentId]
+    );
+
+    res.status(200).json({ message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ error: 'Failed to delete comment' });
   }
 });
 

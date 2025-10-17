@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Header } from "../components/Header";
-import { communityApi, Community as CommunityType, Post as PostType, CreateCommunityData, CreatePostData } from '../services/communityApi';
+import { communityApi, Community as CommunityType, Post as PostType, CreateCommunityData, CreatePostData, Comment } from '../services/communityApi';
 import { NetworkBackground } from '../components/NetworkBackground';
 
 // Helper to resolve image URLs from the backend
 const resolveImageUrl = (url?: string) =>
-  url ? (url.startsWith('http') ? url : `http://localhost:3000${url}`) : '';
+  url ? (url.startsWith('http') ? url : `${import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, '') || ''}${url}`) : '';
 
 export default function Community() {
   const [communities, setCommunities] = useState<CommunityType[]>([]);
@@ -30,7 +30,8 @@ export default function Community() {
     name: '',
     description: '',
     category: 'FPS',
-    image_url: ''
+    image_url: '',
+    banner_image_url: ''
   });
 
   const [newPost, setNewPost] = useState<CreatePostData>({
@@ -41,6 +42,17 @@ export default function Community() {
 
   // Full image modal state
   const [fullImage, setFullImage] = useState<string | null>(null);
+
+  // Comments state
+  const [comments, setComments] = useState<{ [postId: number]: Comment[] }>({});
+  const [showComments, setShowComments] = useState<{ [postId: number]: boolean }>({});
+  const [newComment, setNewComment] = useState<{ [postId: number]: string }>({});
+  const [replyImage, setReplyImage] = useState<{ [postId: number]: string }>({});
+  const [showCommentForm, setShowCommentForm] = useState<{ [postId: number]: boolean }>({});
+  const [replyingTo, setReplyingTo] = useState<{ postId: number; commentId?: number } | null>(null);
+  const [commentsOffset, setCommentsOffset] = useState<{ [postId: number]: number }>({});
+  const [hasMoreComments, setHasMoreComments] = useState<{ [postId: number]: boolean }>({});
+  const [expandedReplies, setExpandedReplies] = useState<{ [commentId: number]: boolean }>({});
 
   const categories = ['All', 'FPS', 'RPG', 'Sandbox', 'Racing', 'Indie', 'Esports'];
 
@@ -100,7 +112,7 @@ export default function Community() {
     try {
       setLoading(true);
       await communityApi.createCommunity(newCommunity);
-      setNewCommunity({ name: '', description: '', category: 'FPS', image_url: '' });
+      setNewCommunity({ name: '', description: '', category: 'FPS', image_url: '', banner_image_url: '' });
       setShowCreateCommunity(false);
       await fetchCommunities(); // Refresh communities
     } catch (err) {
@@ -182,6 +194,182 @@ export default function Community() {
     }
   };
 
+  // Handle like/unlike comment
+  const handleLikeComment = async (postId: number, commentId: number, isLiked: boolean) => {
+    if (!isAuthenticated || !selectedCommunity) return setError('Please log in to like comments');
+    try {
+      if (isLiked) {
+        await communityApi.unlikeComment(selectedCommunity.id, postId, commentId);
+      } else {
+        await communityApi.likeComment(selectedCommunity.id, postId, commentId);
+      }
+      // Update comment likes count
+      setComments(prev => ({
+        ...prev,
+        [postId]: prev[postId].map(c => 
+          c.id === commentId 
+            ? { ...c, likes_count: isLiked ? c.likes_count - 1 : c.likes_count + 1, is_liked: !isLiked }
+            : c
+        )
+      }));
+    } catch (err) {
+      setError('Failed to toggle comment like');
+    }
+  };
+
+  // Type for comments with replies
+  type CommentWithReplies = Comment & { replies: CommentWithReplies[] };
+
+  // Build comment tree for proper nesting
+  const buildCommentTree = (comments: Comment[]): CommentWithReplies[] => {
+    const commentMap = new Map<number, CommentWithReplies>();
+    const rootComments: CommentWithReplies[] = [];
+
+    // Initialize all comments with empty replies array
+    comments.forEach(comment => {
+      commentMap.set(comment.id, { ...comment, replies: [] });
+    });
+
+    // Build the tree
+    comments.forEach(comment => {
+      if (comment.parent_comment_id) {
+        const parent = commentMap.get(comment.parent_comment_id);
+        if (parent) {
+          parent.replies.push(commentMap.get(comment.id)!);
+        } else {
+          // If parent not found, treat as root comment
+          rootComments.push(commentMap.get(comment.id)!);
+        }
+      } else {
+        rootComments.push(commentMap.get(comment.id)!);
+      }
+    });
+
+    return rootComments;
+  };
+
+  // Recursive component to render comments and replies
+  const CommentComponent = ({ comment, postId, depth = 0 }: { comment: CommentWithReplies, postId: number, depth?: number }) => {
+    const maxDepth = 3; // Limit nesting depth for readability
+    const shouldIndent = depth > 0 && depth < maxDepth;
+    const hasNestedReplies = comment.replies && comment.replies.length > 0;
+    const isExpanded = expandedReplies[comment.id] !== false; // Default to expanded for root comments
+
+    // Handle delete comment
+    const handleDeleteComment = async (commentId: number) => {
+      if (!selectedCommunity || !isAuthenticated || role !== 'admin') return;
+      
+      if (!confirm('Are you sure you want to delete this comment? This action cannot be undone.')) return;
+      
+      try {
+        await communityApi.deleteComment(selectedCommunity.id, postId, commentId);
+        
+        // Remove the comment from state
+        setComments(prev => ({
+          ...prev,
+          [postId]: prev[postId].filter(c => c.id !== commentId)
+        }));
+        
+        // Update post comments count
+        setPosts(prev => prev.map(p => 
+          p.id === postId 
+            ? { ...p, comments_count: p.comments_count - 1 }
+            : p
+        ));
+        
+        setError(null);
+      } catch (err) {
+        setError('Failed to delete comment');
+        console.error('Error deleting comment:', err);
+      }
+    };
+
+    return (
+      <div key={comment.id}>
+        <div className={`flex gap-3 ${shouldIndent ? 'ml-12' : ''}`}>
+          <div className="w-8 h-8 bg-gradient-to-r from-accent to-purple-400 rounded-full flex items-center justify-center flex-shrink-0">
+            <span className="text-black font-bold text-xs">
+              {comment.author.charAt(0).toUpperCase()}
+            </span>
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-white font-jost font-semibold text-sm">{comment.author}</span>
+              <span className="text-white/50 text-xs font-jost">{formatTimeAgo(comment.created_at)}</span>
+            </div>
+            <p className="text-white/90 font-jost text-sm leading-relaxed mb-2">{comment.content}</p>
+            {comment.image_url && (
+              <div className="mb-2">
+                <img 
+                  src={resolveImageUrl(comment.image_url)} 
+                  alt="Comment content" 
+                  className="max-w-xs max-h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => setFullImage(resolveImageUrl(comment.image_url))}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            <div className="flex items-center gap-4">
+              {isAuthenticated && (
+                <button
+                  onClick={() => handleLikeComment(postId, comment.id, comment.is_liked || false)}
+                  className={`flex items-center gap-1 text-xs font-jost transition-colors ${
+                    comment.is_liked ? 'text-accent' : 'text-white/60 hover:text-accent'
+                  }`}
+                >
+                  <svg className={`w-4 h-4 transition-transform ${comment.is_liked ? 'fill-current' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  <span>{comment.likes_count}</span>
+                </button>
+              )}
+              {depth < maxDepth && (
+                <button
+                  onClick={() => setReplyingTo({ postId, commentId: comment.id })}
+                  className="text-white/60 hover:text-accent text-xs font-jost transition-colors"
+                >
+                  Reply
+                </button>
+              )}
+              {role === 'admin' && (
+                <button
+                  onClick={() => handleDeleteComment(comment.id)}
+                  className="text-red-400 hover:text-red-300 text-xs font-jost transition-colors"
+                >
+                  Delete
+                </button>
+              )}
+              {hasNestedReplies && (
+                <button
+                  onClick={() => setExpandedReplies(prev => ({ ...prev, [comment.id]: !isExpanded }))}
+                  className="text-accent hover:text-accent/80 text-xs font-jost transition-colors"
+                >
+                  {isExpanded ? 'Hide replies' : `View ${comment.replies.length} ${comment.replies.length === 1 ? 'reply' : 'replies'}`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Render replies */}
+        {hasNestedReplies && isExpanded && (
+          <div className="mt-4 space-y-4 ml-12">
+            {comment.replies.map(reply => (
+              <CommentComponent 
+                key={reply.id} 
+                comment={reply} 
+                postId={postId} 
+                depth={depth + 1} 
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -190,6 +378,99 @@ export default function Community() {
     if (diffInHours < 1) return 'just now';
     if (diffInHours < 24) return `${diffInHours} hours ago`;
     return `${Math.floor(diffInHours / 24)} days ago`;
+  };
+
+  // Fetch comments for a post
+  const fetchComments = async (communityId: number, postId: number, loadMore: boolean = false) => {
+    try {
+      const offset = loadMore ? (commentsOffset[postId] || 0) : 0;
+      const { comments: fetchedComments, hasMore } = await communityApi.getPostComments(communityId, postId, 5, offset);
+      
+      setComments(prev => ({
+        ...prev,
+        [postId]: loadMore ? [...(prev[postId] || []), ...fetchedComments] : fetchedComments
+      }));
+      
+      setCommentsOffset(prev => ({ ...prev, [postId]: offset + fetchedComments.length }));
+      setHasMoreComments(prev => ({ ...prev, [postId]: hasMore }));
+
+      // Initialize expanded state for new comments - root comments expanded, nested collapsed
+      if (!loadMore) {
+        const rootCommentIds = fetchedComments
+          .filter(comment => !comment.parent_comment_id)
+          .map(comment => comment.id);
+        
+        setExpandedReplies(prev => {
+          const newState = { ...prev };
+          rootCommentIds.forEach(id => {
+            if (!(id in newState)) {
+              newState[id] = true; // Root comments start expanded
+            }
+          });
+          return newState;
+        });
+      }
+    } catch (err) {
+      setError('Failed to load comments');
+      console.error('Error fetching comments:', err);
+    }
+  };
+
+  // Load more comments
+  const loadMoreComments = (postId: number) => {
+    if (selectedCommunity) {
+      fetchComments(selectedCommunity.id, postId, true);
+    }
+  };
+
+  // Handle create comment
+  const handleCreateComment = async (postId: number, content: string, parentCommentId?: number, image_url?: string) => {
+    if (!isAuthenticated || !selectedCommunity) return setError('Please log in and select a community');
+    if (!content.trim()) return;
+
+    try {
+      setLoading(true);
+      await communityApi.createComment(selectedCommunity.id, postId, { content, parent_comment_id: parentCommentId, image_url });
+      setNewComment(prev => ({ ...prev, [postId]: '' }));
+      setReplyImage(prev => ({ ...prev, [postId]: '' }));
+      setReplyingTo(null);
+      await fetchComments(selectedCommunity.id, postId); // Refresh comments
+      // Update post comments count
+      setPosts(prev => prev.map(p => 
+        p.id === postId 
+          ? { ...p, comments_count: p.comments_count + 1 }
+          : p
+      ));
+    } catch (err) {
+      setError('Failed to create comment');
+      console.error('Error creating comment:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Toggle comments visibility
+  const toggleComments = (postId: number) => {
+    const currentlyShown = showComments[postId] || false;
+    setShowComments(prev => ({ ...prev, [postId]: !currentlyShown }));
+    if (!currentlyShown && !comments[postId]) {
+      // Reset pagination when opening comments
+      setCommentsOffset(prev => ({ ...prev, [postId]: 0 }));
+      setHasMoreComments(prev => ({ ...prev, [postId]: false }));
+      // Reset expanded replies state - root comments start expanded, nested start collapsed
+      setExpandedReplies(prev => {
+        const newState = { ...prev };
+        // Remove expanded state for comments that will be re-rendered
+        Object.keys(newState).forEach(key => {
+          const commentId = parseInt(key);
+          if (comments[postId]?.some(c => c.id === commentId)) {
+            delete newState[commentId];
+          }
+        });
+        return newState;
+      });
+      fetchComments(selectedCommunity!.id, postId, false);
+    }
   };
 
   const filteredCommunities = communities.filter(community => {
@@ -224,50 +505,70 @@ export default function Community() {
 
             {/* Community Header */}
             <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden mb-8 shadow-[0_4px_30px_-5px_rgba(0,0,0,0.4)]">
-              <div className="relative h-32 bg-gradient-to-r from-accent/20 to-purple-500/20">
-                <div className="absolute inset-0 bg-black/40"></div>
-              </div>
-              <div className="p-8">
-                <div className="flex items-start gap-6">
-                  <div className="w-24 h-24 -mt-16 relative z-10 rounded-xl overflow-hidden border-4 border-white/20 shadow-xl bg-gradient-to-br from-accent to-purple-400 flex items-center justify-center">
-                    {selectedCommunity.image_url ? (
-                      <img 
-                        src={resolveImageUrl(selectedCommunity.image_url)} 
-                        alt={selectedCommunity.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-black font-bold text-2xl">
-                        {selectedCommunity.name.charAt(0)}
-                      </span>
-                    )}
+              <div className="relative">
+                {/* Banner Image */}
+                {selectedCommunity.banner_image_url ? (
+                  <div className="h-48 md:h-64 overflow-hidden">
+                    <img 
+                      src={resolveImageUrl(selectedCommunity.banner_image_url)} 
+                      alt={`${selectedCommunity.name} banner`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
                   </div>
-                  <div className="flex-1 pt-2">
-                    <h1 className="text-white font-montserrat text-3xl md:text-4xl font-bold tracking-wider uppercase mb-2">
-                      {selectedCommunity.name}
-                    </h1>
-                    <p className="text-white/80 text-lg mb-4 leading-relaxed">{selectedCommunity.description}</p>
-                    <div className="flex items-center gap-6 text-white/60">
-                      <span className="font-jost">{selectedCommunity.member_count} members</span>
-                      <span className="font-jost">{selectedCommunity.post_count} posts</span>
-                      <span className="bg-accent/20 text-accent px-3 py-1 rounded-full text-sm font-jost uppercase tracking-wide">
-                        {selectedCommunity.category}
-                      </span>
-                      {isMember && (
-                        <span className="bg-accent text-black px-3 py-1 rounded-full text-sm font-jost uppercase tracking-wide">
-                          Joined ({role})
-                        </span>
+                ) : (
+                  <div className="relative h-32 bg-gradient-to-r from-accent/20 to-purple-500/20">
+                    <div className="absolute inset-0 bg-black/40"></div>
+                  </div>
+                )}
+                
+                <div className="absolute inset-0 flex items-end">
+                  <div className="p-8 w-full">
+                    <div className="flex items-start gap-6">
+                      <div className="w-24 h-24 -mt-16 relative z-10 rounded-xl overflow-hidden border-4 border-white/20 shadow-xl bg-gradient-to-br from-accent to-purple-400 flex items-center justify-center">
+                        {selectedCommunity.image_url ? (
+                          <img 
+                            src={resolveImageUrl(selectedCommunity.image_url)} 
+                            alt={selectedCommunity.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-black font-bold text-2xl">
+                            {selectedCommunity.name.charAt(0)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 pt-2">
+                        <h1 className="text-white font-montserrat text-3xl md:text-4xl font-bold tracking-wider uppercase mb-2">
+                          {selectedCommunity.name}
+                        </h1>
+                        <p className="text-white/80 text-lg mb-4 leading-relaxed">{selectedCommunity.description}</p>
+                        <div className="flex items-center gap-6 text-white/60">
+                          <span className="font-jost">{selectedCommunity.member_count} members</span>
+                          <span className="font-jost">{selectedCommunity.post_count} posts</span>
+                          <span className="bg-accent/20 text-accent px-3 py-1 rounded-full text-sm font-jost uppercase tracking-wide">
+                            {selectedCommunity.category}
+                          </span>
+                          {isMember && (
+                            <span className="bg-accent text-black px-3 py-1 rounded-full text-sm font-jost uppercase tracking-wide">
+                              Joined ({role})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {isAuthenticated && (
+                        <button 
+                          onClick={isMember ? handleLeave : handleJoin}
+                          className="bg-accent text-black font-jost font-bold px-6 py-3 rounded-lg uppercase tracking-wider hover:bg-accent/90 transition-colors"
+                        >
+                          {isMember ? 'Leave Community' : 'Join Community'}
+                        </button>
                       )}
                     </div>
                   </div>
-                  {isAuthenticated && (
-                    <button 
-                      onClick={isMember ? handleLeave : handleJoin}
-                      className="bg-accent text-black font-jost font-bold px-6 py-3 rounded-lg uppercase tracking-wider hover:bg-accent/90 transition-colors"
-                    >
-                      {isMember ? 'Leave Community' : 'Join Community'}
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
@@ -452,7 +753,10 @@ export default function Community() {
                           </button>
                         )}
                         
-                        <button className="flex items-center gap-2 text-white/60 hover:text-accent transition-colors group">
+                        <button 
+                          onClick={() => toggleComments(post.id)}
+                          className="flex items-center gap-2 text-white/60 hover:text-accent transition-colors group"
+                        >
                           <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                           </svg>
@@ -466,6 +770,236 @@ export default function Community() {
                           <span className="font-jost">Share</span>
                         </button>
                       </div>
+
+                      {/* Comments Section */}
+                      {showComments[post.id] && (
+                        <div className="mt-6 pt-6 border-t border-white/10">
+                          {/* Comments List */}
+                          {comments[post.id] && comments[post.id].length > 0 && (
+                            <div className="space-y-4 mb-6">
+                              {buildCommentTree(comments[post.id]).map((comment) => (
+                                <CommentComponent 
+                                  key={comment.id} 
+                                  comment={comment} 
+                                  postId={post.id} 
+                                />
+                              ))}
+                              
+                              {/* Load More Button */}
+                              {hasMoreComments[post.id] && (
+                                <div className="text-center">
+                                  <button
+                                    onClick={() => loadMoreComments(post.id)}
+                                    className="text-accent hover:text-accent/80 font-jost text-sm transition-colors"
+                                  >
+                                    Load more comments...
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Reply Form */}
+                          {replyingTo?.postId === post.id && (
+                            <div className="mb-4 p-4 bg-black/20 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-white/70 text-sm font-jost">
+                                  Replying to {replyingTo.commentId ? 'comment' : 'post'}
+                                </span>
+                                <button
+                                  onClick={() => setReplyingTo(null)}
+                                  className="text-white/50 hover:text-white text-sm"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              <div className="space-y-3">
+                                <input
+                                  type="text"
+                                  value={newComment[post.id] || ''}
+                                  onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                  placeholder="Write a reply..."
+                                  className="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-white placeholder-white/40 font-jost text-sm focus:outline-none focus:ring-1 focus:ring-accent/70 focus:border-accent/70 transition"
+                                  required
+                                />
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        const file = e.target.files[0];
+                                        const formData = new FormData();
+                                        formData.append('image', file);
+                                        
+                                        setLoading(true);
+                                        fetch('http://localhost:3000/api/upload', {
+                                          method: 'POST',
+                                          headers: isAuthenticated ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {},
+                                          body: formData,
+                                        })
+                                          .then(res => res.json())
+                                          .then(data => {
+                                            setReplyImage(prev => ({ ...prev, [post.id]: data.url }));
+                                            setError(null);
+                                          })
+                                          .catch(err => {
+                                            console.error('Error uploading image:', err);
+                                            setError('Failed to upload image');
+                                          })
+                                          .finally(() => setLoading(false));
+                                      }
+                                    }}
+                                    className="hidden" 
+                                    id={`replyImageUpload-${post.id}`}
+                                  />
+                                  <label 
+                                    htmlFor={`replyImageUpload-${post.id}`}
+                                    className="flex-1 bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-white/60 font-jost cursor-pointer hover:bg-black/50 transition flex items-center gap-2 text-sm"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    {replyImage[post.id] ? 'Image selected' : 'Add image (optional)'}
+                                  </label>
+                                  {replyImage[post.id] && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setReplyImage(prev => ({ ...prev, [post.id]: '' }))}
+                                      className="bg-red-500/20 hover:bg-red-500/30 text-red-100 p-2 rounded-lg transition"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
+                                {replyImage[post.id] && (
+                                  <div className="relative h-20 w-20 rounded-lg overflow-hidden border-2 border-white/20">
+                                    <img 
+                                      src={resolveImageUrl(replyImage[post.id])}
+                                      alt="Preview" 
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                )}
+                                <button
+                                  onClick={() => handleCreateComment(post.id, newComment[post.id] || '', replyingTo.commentId, replyImage[post.id])}
+                                  disabled={loading || !newComment[post.id]?.trim()}
+                                  className="bg-accent text-black font-jost font-bold px-4 py-2 rounded-lg text-sm uppercase tracking-wider hover:bg-accent/90 transition-colors disabled:opacity-50"
+                                >
+                                  Reply
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Add Comment Form */}
+                          {isAuthenticated && (!replyingTo || replyingTo.postId !== post.id) && (
+                            <div className="mt-4">
+                              {!showCommentForm[post.id] ? (
+                                <button
+                                  onClick={() => setShowCommentForm(prev => ({ ...prev, [post.id]: true }))}
+                                  className="text-white/60 hover:text-accent transition-colors text-sm font-jost"
+                                >
+                                  Write a comment...
+                                </button>
+                              ) : (
+                                <div className="space-y-3">
+                                  <input
+                                    type="text"
+                                    value={newComment[post.id] || ''}
+                                    onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                    placeholder="Write a comment..."
+                                    className="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-white placeholder-white/40 font-jost text-sm focus:outline-none focus:ring-1 focus:ring-accent/70 focus:border-accent/70 transition"
+                                    required
+                                  />
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                          const file = e.target.files[0];
+                                          const formData = new FormData();
+                                          formData.append('image', file);
+                                          
+                                          setLoading(true);
+                                          fetch('http://localhost:3000/api/upload', {
+                                            method: 'POST',
+                                            headers: isAuthenticated ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {},
+                                            body: formData,
+                                          })
+                                            .then(res => res.json())
+                                            .then(data => {
+                                              setReplyImage(prev => ({ ...prev, [post.id]: data.url }));
+                                              setError(null);
+                                            })
+                                            .catch(err => {
+                                              console.error('Error uploading image:', err);
+                                              setError('Failed to upload image');
+                                            })
+                                            .finally(() => setLoading(false));
+                                        }
+                                      }}
+                                      className="hidden" 
+                                      id={`commentImageUpload-${post.id}`}
+                                    />
+                                    <label 
+                                      htmlFor={`commentImageUpload-${post.id}`}
+                                      className="flex-1 bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-white/60 font-jost cursor-pointer hover:bg-black/50 transition flex items-center gap-2 text-sm"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                      {replyImage[post.id] ? 'Image selected' : 'Add image (optional)'}
+                                    </label>
+                                    {replyImage[post.id] && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setReplyImage(prev => ({ ...prev, [post.id]: '' }))}
+                                        className="bg-red-500/20 hover:bg-red-500/30 text-red-100 p-2 rounded-lg transition"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                  {replyImage[post.id] && (
+                                    <div className="relative h-20 w-20 rounded-lg overflow-hidden border-2 border-white/20">
+                                      <img 
+                                        src={resolveImageUrl(replyImage[post.id])}
+                                        alt="Preview" 
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => handleCreateComment(post.id, newComment[post.id] || '', undefined, replyImage[post.id])}
+                                      disabled={loading || !newComment[post.id]?.trim()}
+                                      className="bg-accent text-black font-jost font-bold px-4 py-2 rounded-lg text-sm uppercase tracking-wider hover:bg-accent/90 transition-colors disabled:opacity-50"
+                                    >
+                                      Comment
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setShowCommentForm(prev => ({ ...prev, [post.id]: false }));
+                                        setNewComment(prev => ({ ...prev, [post.id]: '' }));
+                                        setReplyImage(prev => ({ ...prev, [post.id]: '' }));
+                                      }}
+                                      className="text-white/60 hover:text-white transition-colors text-sm font-jost"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </article>
                 ))
@@ -624,6 +1158,71 @@ export default function Community() {
                         <img 
                           src={resolveImageUrl(newCommunity.image_url)}
                           alt="Preview" 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-white/70 text-sm">Banner Image (optional)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const file = e.target.files[0];
+                            const formData = new FormData();
+                            formData.append('image', file);
+                            
+                            setLoading(true);
+                            fetch('http://localhost:3000/api/upload', {
+                              method: 'POST',
+                              headers: isAuthenticated ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {},
+                              body: formData,
+                            })
+                              .then(res => res.json())
+                              .then(data => {
+                                setNewCommunity({...newCommunity, banner_image_url: data.url});
+                                setError(null);
+                              })
+                              .catch(err => {
+                                console.error('Error uploading banner image:', err);
+                                setError('Failed to upload banner image');
+                              })
+                              .finally(() => setLoading(false));
+                          }
+                        }}
+                        className="hidden" 
+                        id="communityBannerUpload"
+                      />
+                      <label 
+                        htmlFor="communityBannerUpload"
+                        className="flex-1 bg-black/40 border border-white/15 rounded-lg px-4 py-3 text-white/60 font-jost cursor-pointer hover:bg-black/50 transition flex items-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        {newCommunity.banner_image_url ? 'Banner selected' : 'Choose banner...'}
+                      </label>
+                      {newCommunity.banner_image_url && (
+                        <button
+                          type="button"
+                          onClick={() => setNewCommunity({...newCommunity, banner_image_url: ''})}
+                          className="bg-red-500/20 hover:bg-red-500/30 text-red-100 p-3 rounded-lg transition"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    {newCommunity.banner_image_url && (
+                      <div className="mt-2 relative h-32 w-full rounded-lg overflow-hidden border-2 border-white/20">
+                        <img 
+                          src={resolveImageUrl(newCommunity.banner_image_url)}
+                          alt="Banner Preview" 
                           className="w-full h-full object-cover"
                         />
                       </div>
