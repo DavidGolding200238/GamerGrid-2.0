@@ -1,5 +1,4 @@
-// API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+import { API_BASE, imgSrc } from '../config/api';
 
 export interface User {
   id: number;
@@ -33,7 +32,7 @@ class AuthService {
   async register(data: RegisterData): Promise<AuthResponse> {
     console.log('Attempting registration for:', data.username);
     
-    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    const response = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,18 +50,23 @@ class AuthService {
 
     const result = await response.json();
     console.log('Registration successful:', result);
+
+    const normalizedUser: User = {
+      ...result.user,
+      profile_image: imgSrc(result.user.profile_image) ?? undefined,
+    };
     
     // Store token and user info
-    this.storeAuth(result.accessToken, result.user);
+    this.storeAuth(result.accessToken, normalizedUser);
     
-    return result;
+    return { ...result, user: normalizedUser };
   }
 
   // Login user
   async login(data: LoginData): Promise<AuthResponse> {
     console.log('Attempting login for:', data.username);
     
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    const response = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -80,11 +84,16 @@ class AuthService {
 
     const result = await response.json();
     console.log('Login successful:', result);
+
+    const normalizedUser: User = {
+      ...result.user,
+      profile_image: imgSrc(result.user.profile_image) ?? undefined,
+    };
     
     // Store token and user info
-    this.storeAuth(result.accessToken, result.user);
+    this.storeAuth(result.accessToken, normalizedUser);
     
-    return result;
+    return { ...result, user: normalizedUser };
   }
 
   // Logout user
@@ -92,7 +101,7 @@ class AuthService {
     try {
       const token = this.getToken();
       if (token) {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
+        await fetch(`${API_BASE}/auth/logout`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -114,7 +123,7 @@ class AuthService {
       throw new Error('No authentication token');
     }
 
-    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+    const response = await fetch(`${API_BASE}/auth/profile`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -129,19 +138,28 @@ class AuthService {
     }
 
     const result = await response.json();
-    return result.user;
+    return {
+      ...result.user,
+      profile_image: imgSrc(result.user.profile_image) ?? undefined,
+    };
   }
 
   // Store authentication data
   private storeAuth(token: string, user: User): void {
+    const normalizedUser: User = {
+      ...user,
+      profile_image: imgSrc(user.profile_image) ?? undefined,
+    };
     localStorage.setItem('accessToken', token);
-    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('user', JSON.stringify(normalizedUser));
+    this.notifyAuthChange();
   }
 
   // Clear authentication data
   private clearAuth(): void {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('user');
+    this.notifyAuthChange();
   }
 
   // Get stored token
@@ -158,6 +176,12 @@ class AuthService {
   // Check if user is authenticated
   isAuthenticated(): boolean {
     return !!this.getToken() && !!this.getUser();
+  }
+
+  private notifyAuthChange(): void {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('auth-change'));
+    }
   }
 }
 

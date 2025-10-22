@@ -1,4 +1,21 @@
-import { Game, GamesResponse } from "../../../shared/api";
+interface Game {
+  id: string;
+  title: string;
+  image: string;
+  genres: string[];
+  platform: string[];
+  rating: number;
+  releaseDate?: string;
+  description?: string;
+  featured?: boolean;
+}
+
+interface GamesResponse {
+  games: Game[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
 
 const RAWG_API_KEY = "c60ed11f699e430485308b3a910b1cb7";
 const RAWG_BASE_URL = "https://api.rawg.io/api";

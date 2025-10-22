@@ -1,91 +1,145 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-import { createUser, authenticateUser, generateTokens, getUserById } from '../services/authService.js';
-import { sendVerificationEmail, sendResetEmail } from '../services/emailService.js';
+import { generateTokens, getUserById, User } from '../services/authService.js';
+import { sendResetEmail } from '../services/emailService.js';
 import { db } from '../config/database.js';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
+import { toRelativeUploadPath } from '../utils/uploads.js';
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
+const logSqlError = (route: string, error: any) => {
+  if (!error) return;
+  console.error({
+    route,
+    code: error.code,
+    sqlMessage: error.sqlMessage,
+  });
+};
 
 // User registration
 export async function registerUser(req: Request, res: Response) {
+  const { username, email, password, displayName } = req.body ?? {};
+
+  if (!isNonEmptyString(username) || !isNonEmptyString(email) || !isNonEmptyString(password)) {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+
   try {
-    const { username, email, password, displayName } = req.body;
+    const hashedPassword = await bcrypt.hash(password.trim(), 12);
+    const preferredDisplayName =
+      isNonEmptyString(displayName) ? displayName.trim() : username.trim();
 
-    // Validate required fields
-    if (!username || !email || !password) {
-      return res.status(400).json({
-        error: 'Username, email, and password are required'
-      });
+    const [result] = await db.execute<ResultSetHeader>(
+      `
+        INSERT INTO users (username, email, password_hash, display_name)
+        VALUES (?, ?, ?, ?)
+      `,
+      [username.trim(), email.trim(), hashedPassword, preferredDisplayName]
+    );
+
+    const userId = result.insertId;
+    const user = await getUserById(userId);
+
+    if (!user) {
+      return res.status(500).json({ error: 'Internal server error' });
     }
 
-    // Validate password length
-    if (password.length < 6) {
-      return res.status(400).json({
-        error: 'Password must be at least 6 characters long'
-      });
-    }
+    const { accessToken, user: userPayload } = generateTokens(user);
 
-    // Create user
-    const newUser = await createUser(username, email, password, displayName);
-
-    // Generate tokens
-    const { accessToken, user } = generateTokens(newUser);
-
-    res.status(201).json({
+    return res.status(201).json({
       message: 'User registered successfully',
-      user,
-      accessToken
+      user: userPayload,
+      accessToken,
     });
-
   } catch (error: any) {
-    console.error('Registration error:', error);
-    
-    if (error.message === 'Username or email already exists') {
-      return res.status(409).json({
-        error: error.message
-      });
+    logSqlError('registerUser', error);
+
+    if (error?.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Username or email already exists' });
     }
 
-    res.status(500).json({
-      error: 'Internal server error during registration'
-    });
+    if (error?.code === 'ER_BAD_NULL_ERROR') {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
 // User login
 export async function loginUser(req: Request, res: Response) {
+  const { username, email, password } = req.body ?? {};
+
+  const identifier = isNonEmptyString(username)
+    ? username.trim()
+    : isNonEmptyString(email)
+    ? email.trim()
+    : null;
+
+  if (!identifier || !isNonEmptyString(password)) {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+
   try {
-    const { username, password } = req.body;
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `
+        SELECT id, username, email, password_hash, display_name, profile_image, created_at
+        FROM users
+        WHERE username = ? OR email = ?
+        LIMIT 1
+      `,
+      [identifier, identifier]
+    );
 
-    // Validate required fields
-    if (!username || !password) {
-      return res.status(400).json({
-        error: 'Username and password are required'
-      });
+    if (rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Authenticate user
-    const user = await authenticateUser(username, password);
+    const userRow = rows[0] as RowDataPacket & {
+      id: number;
+      username: string;
+      email: string;
+      password_hash?: string | null;
+      display_name: string;
+      profile_image?: string | null;
+      created_at: Date | string;
+    };
 
-    if (!user) {
-      return res.status(401).json({
-        error: 'Invalid username or password'
-      });
+    if (!userRow.password_hash) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate tokens
-    const { accessToken, user: userInfo } = generateTokens(user);
+    const matches = await bcrypt.compare(password.trim(), userRow.password_hash);
 
-    res.json({
+    if (!matches) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const sanitizedUser: User = {
+      id: userRow.id,
+      username: userRow.username,
+      email: userRow.email,
+      display_name: userRow.display_name,
+      profile_image: toRelativeUploadPath(userRow.profile_image) ?? undefined,
+      created_at:
+        userRow.created_at instanceof Date
+          ? userRow.created_at
+          : new Date(userRow.created_at),
+    };
+
+    const { accessToken, user: userInfo } = generateTokens(sanitizedUser);
+
+    return res.status(200).json({
       message: 'Login successful',
       user: userInfo,
-      accessToken
+      accessToken,
     });
-
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      error: 'Internal server error during login'
-    });
+    logSqlError('loginUser', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -207,11 +261,11 @@ export async function resetPassword(req: Request, res: Response) {
     const user = (rows as any[])[0];
 
     // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
 
     // Update password and clear reset token
     await db.execute(
-      'UPDATE users SET password = ?, reset_token = NULL, reset_expires = NULL WHERE id = ?',
+      'UPDATE users SET password_hash = ?, reset_token = NULL, reset_expires = NULL WHERE id = ?',
       [hashedPassword, user.id]
     );
 

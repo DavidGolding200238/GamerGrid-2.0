@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Header } from "../components/Header";
 import { communityApi, Community as CommunityType, Post as PostType, CreateCommunityData, CreatePostData, Comment } from '../services/communityApi';
+import { authService, User as AuthUser } from '../services/authService';
 import { NetworkBackground } from '../components/NetworkBackground';
+import { imgSrc } from '../config/api';
 
 // Helper to resolve image URLs from the backend
-const resolveImageUrl = (url?: string) =>
-  url ? (url.startsWith('http') ? url : `${import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, '') || ''}${url}`) : '';
+const resolveImageUrl = (url?: string) => imgSrc(url) ?? '';
 
 export default function Community() {
   const [communities, setCommunities] = useState<CommunityType[]>([]);
@@ -19,7 +20,9 @@ export default function Community() {
   const [showCreatePost, setShowCreatePost] = useState(false);
 
   // Auth check
-  const isAuthenticated = !!localStorage.getItem('accessToken');
+  const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('accessToken'));
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => authService.getUser());
+  const isAuthenticated = !!authToken;
 
   // Membership state for selected community
   const [isMember, setIsMember] = useState(false);
@@ -64,10 +67,28 @@ export default function Community() {
     }
   }, [selectedCommunity]);
 
-  // Fetch communities on component mount
+  // Listen for login/logout events so we can react when auth changes
   useEffect(() => {
-    fetchCommunities();
+    const handleAuthChange = () => {
+      const token = localStorage.getItem('accessToken');
+      setAuthToken(token);
+      setCurrentUser(authService.getUser());
+    };
+
+    window.addEventListener('auth-change', handleAuthChange);
+    window.addEventListener('storage', handleAuthChange);
+
+    return () => {
+      window.removeEventListener('auth-change', handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
+    };
   }, []);
+
+  // Fetch communities whenever auth token changes (includes initial render)
+  useEffect(() => {
+    setCurrentUser(authService.getUser());
+    fetchCommunities();
+  }, [authToken]);
 
   // Fetch posts when community is selected
   useEffect(() => {
@@ -81,6 +102,11 @@ export default function Community() {
       setLoading(true);
       const fetchedCommunities = await communityApi.getCommunities();
       setCommunities(fetchedCommunities);
+      setSelectedCommunity(prev => {
+        if (!prev) return null;
+        const updated = fetchedCommunities.find(c => c.id === prev.id);
+        return updated ? { ...prev, ...updated } : prev;
+      });
       setError(null);
     } catch (err) {
       setError('Failed to load communities');
@@ -153,11 +179,21 @@ export default function Community() {
   // Handle join community
   const handleJoin = async () => {
     if (!isAuthenticated) return setError('Please log in to join');
+    if (!selectedCommunity) return setError('Please select a community first');
     try {
-      await communityApi.joinCommunity(selectedCommunity!.id);
+      await communityApi.joinCommunity(selectedCommunity.id);
       setIsMember(true);
       setRole('member');
-      setSelectedCommunity(prev => prev ? { ...prev, member_count: prev.member_count + 1 } : null);
+      setSelectedCommunity(prev => prev ? { ...prev, member_count: prev.member_count + 1, is_member: true, role: 'member' } : null);
+      await fetchCommunities();
+      try {
+        const refreshed = await communityApi.getCommunity(selectedCommunity.id);
+        setSelectedCommunity(refreshed);
+        setIsMember(refreshed.is_member ?? false);
+        setRole(refreshed.role ?? null);
+      } catch (innerError) {
+        console.error('Failed to refresh community after join:', innerError);
+      }
     } catch (err) {
       setError('Failed to join community');
     }
@@ -165,11 +201,21 @@ export default function Community() {
 
   // Handle leave community
   const handleLeave = async () => {
+    if (!selectedCommunity) return setError('Please select a community first');
     try {
-      await communityApi.leaveCommunity(selectedCommunity!.id);
+      await communityApi.leaveCommunity(selectedCommunity.id);
       setIsMember(false);
       setRole(null);
-      setSelectedCommunity(prev => prev ? { ...prev, member_count: prev.member_count - 1 } : null);
+      setSelectedCommunity(prev => prev ? { ...prev, member_count: prev.member_count - 1, is_member: false, role: null } : null);
+      await fetchCommunities();
+      try {
+        const refreshed = await communityApi.getCommunity(selectedCommunity.id);
+        setSelectedCommunity(refreshed);
+        setIsMember(refreshed.is_member ?? false);
+        setRole(refreshed.role ?? null);
+      } catch (innerError) {
+        console.error('Failed to refresh community after leave:', innerError);
+      }
     } catch (err) {
       setError('Failed to leave community');
     }
@@ -178,11 +224,13 @@ export default function Community() {
   // Handle like/unlike post
   const handleLike = async (postId: number, isLiked: boolean) => {
     if (!isAuthenticated) return setError('Please log in to like posts');
+    if (!selectedCommunity) return setError('Please select a community first');
+    const communityId = selectedCommunity.id;
     try {
       if (isLiked) {
-        await communityApi.unlikePost(postId);
+        await communityApi.unlikePost(communityId, postId);
       } else {
-        await communityApi.likePost(postId);
+        await communityApi.likePost(communityId, postId);
       }
       setPosts(prev => prev.map(p => 
         p.id === postId 
@@ -191,6 +239,88 @@ export default function Community() {
       ));
     } catch (err) {
       setError('Failed to toggle like');
+    }
+  };
+
+  // Handle delete post
+  const handleDeletePost = async (postId: number) => {
+    if (!selectedCommunity || !isAuthenticated) return;
+    const targetPost = posts.find((p) => p.id === postId);
+    if (!targetPost) return;
+
+    const isPostAuthor = currentUser ? targetPost.user_id === currentUser.id : false;
+    const isAdmin = role === 'admin';
+    if (!isAdmin && !isPostAuthor) return;
+
+    if (!confirm('Are you sure you want to delete this post? This will remove all replies as well.')) return;
+
+    const postCommentsSnapshot = comments[postId] ?? [];
+    const removedCommentIds = new Set(postCommentsSnapshot.map((comment) => comment.id));
+
+    try {
+      await communityApi.deletePost(selectedCommunity.id, postId);
+
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      setComments((prev) => {
+        const next = { ...prev };
+        delete next[postId];
+        return next;
+      });
+      setShowComments((prev) => {
+        const next = { ...prev };
+        delete next[postId];
+        return next;
+      });
+      setShowCommentForm((prev) => {
+        const next = { ...prev };
+        delete next[postId];
+        return next;
+      });
+      setNewComment((prev) => {
+        const next = { ...prev };
+        delete next[postId];
+        return next;
+      });
+      setReplyImage((prev) => {
+        const next = { ...prev };
+        delete next[postId];
+        return next;
+      });
+      setCommentsOffset((prev) => {
+        const next = { ...prev };
+        delete next[postId];
+        return next;
+      });
+      setHasMoreComments((prev) => {
+        const next = { ...prev };
+        delete next[postId];
+        return next;
+      });
+      if (replyingTo?.postId === postId) {
+        setReplyingTo(null);
+      }
+      setExpandedReplies((prev) => {
+        if (removedCommentIds.size === 0) return prev;
+        const next = { ...prev };
+        for (const id of removedCommentIds) {
+          delete next[id];
+        }
+        return next;
+      });
+      setSelectedCommunity((prev) =>
+        prev ? { ...prev, post_count: Math.max(prev.post_count - 1, 0) } : null
+      );
+      setCommunities((prev) =>
+        prev.map((community) =>
+          community.id === selectedCommunity.id
+            ? { ...community, post_count: Math.max(community.post_count - 1, 0) }
+            : community
+        )
+      );
+      setError(null);
+    } catch (err) {
+      setError('Failed to delete post');
+      console.error('Error deleting post:', err);
     }
   };
 
@@ -254,29 +384,55 @@ export default function Community() {
     const shouldIndent = depth > 0 && depth < maxDepth;
     const hasNestedReplies = comment.replies && comment.replies.length > 0;
     const isExpanded = expandedReplies[comment.id] !== false; // Default to expanded for root comments
+    const isCommentAuthor = currentUser ? (comment.user_id ?? null) === currentUser.id : false;
+    const canDeleteComment = role === 'admin' || isCommentAuthor;
 
     // Handle delete comment
-    const handleDeleteComment = async (commentId: number) => {
-      if (!selectedCommunity || !isAuthenticated || role !== 'admin') return;
+    const handleDeleteComment = async (commentToDelete: CommentWithReplies) => {
+      if (!selectedCommunity || !isAuthenticated || !canDeleteComment) return;
       
       if (!confirm('Are you sure you want to delete this comment? This action cannot be undone.')) return;
       
       try {
-        await communityApi.deleteComment(selectedCommunity.id, postId, commentId);
+        const postCommentsSnapshot = comments[postId] ?? [];
+        const idsToRemove = new Set<number>();
+        const queue: number[] = [commentToDelete.id];
+
+        while (queue.length > 0) {
+          const currentId = queue.pop()!;
+          if (idsToRemove.has(currentId)) continue;
+          idsToRemove.add(currentId);
+          for (const child of postCommentsSnapshot) {
+            if (child.parent_comment_id === currentId) {
+              queue.push(child.id);
+            }
+          }
+        }
+
+        await communityApi.deleteComment(selectedCommunity.id, postId, commentToDelete.id);
         
         // Remove the comment from state
-        setComments(prev => ({
-          ...prev,
-          [postId]: prev[postId].filter(c => c.id !== commentId)
-        }));
-        
+        setComments(prev => {
+          return {
+            ...prev,
+            [postId]: (prev[postId] ?? []).filter(c => !idsToRemove.has(c.id))
+          };
+        });
+
         // Update post comments count
         setPosts(prev => prev.map(p => 
           p.id === postId 
-            ? { ...p, comments_count: p.comments_count - 1 }
+            ? { ...p, comments_count: Math.max(p.comments_count - idsToRemove.size, 0) }
             : p
         ));
         
+        // Collapse any expanded states for removed comments
+        setExpandedReplies(prev => {
+          const newState = { ...prev };
+          idsToRemove.forEach(id => delete newState[id]);
+          return newState;
+        });
+
         setError(null);
       } catch (err) {
         setError('Failed to delete comment');
@@ -333,9 +489,9 @@ export default function Community() {
                   Reply
                 </button>
               )}
-              {role === 'admin' && (
+              {canDeleteComment && (
                 <button
-                  onClick={() => handleDeleteComment(comment.id)}
+                  onClick={() => handleDeleteComment(comment)}
                   className="text-red-400 hover:text-red-300 text-xs font-jost transition-colors"
                 >
                   Delete
@@ -620,12 +776,13 @@ export default function Community() {
                                 const formData = new FormData();
                                 formData.append('image', file);
                                 
-                                setLoading(true);
-                                fetch('http://localhost:3000/api/upload', {
-                                  method: 'POST',
-                                  headers: isAuthenticated ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {},
-                                  body: formData,
-                                })
+                                    setLoading(true);
+                                    const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+                                    fetch(`${API_BASE}/upload`, {
+                                      method: 'POST',
+                                      headers: isAuthenticated ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {},
+                                      body: formData,
+                                    })
                                   .then(res => res.json())
                                   .then(data => {
                                     setNewPost({...newPost, image_url: data.url});
@@ -704,8 +861,10 @@ export default function Community() {
                   <p className="text-lg font-jost">No posts yet. Be the first to post!</p>
                 </div>
               ) : (
-                posts.map((post) => (
-                  <article key={post.id} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden shadow-[0_4px_30px_-5px_rgba(0,0,0,0.4)] hover:bg-white/8 transition-colors">
+                posts.map((post) => {
+                  const canDeletePost = role === 'admin' || (currentUser && post.user_id === currentUser.id);
+                  return (
+                    <article key={post.id} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden shadow-[0_4px_30px_-5px_rgba(0,0,0,0.4)] hover:bg-white/8 transition-colors">
                     <div className="p-6">
                       {/* Post Header */}
                       <div className="flex items-center gap-3 mb-4">
@@ -740,7 +899,7 @@ export default function Community() {
                       )}
 
                       {/* Post Actions */}
-                      <div className="flex items-center gap-6 pt-4 border-t border-white/10">
+                      <div className="flex items-center gap-6 pt-4 border-t border-white/10 flex-wrap">
                         {isAuthenticated && (
                           <button 
                             onClick={() => handleLike(post.id, post.is_liked || false)}
@@ -763,12 +922,22 @@ export default function Community() {
                           <span className="font-jost">{post.comments_count} comments</span>
                         </button>
 
-                        <button className="flex items-center gap-2 text-white/60 hover:text-accent transition-colors group ml-auto">
-                          <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                          </svg>
-                          <span className="font-jost">Share</span>
-                        </button>
+                        <div className="ml-auto flex items-center gap-4">
+                          {canDeletePost && (
+                            <button
+                              onClick={() => handleDeletePost(post.id)}
+                              className="text-red-400 hover:text-red-300 text-sm font-jost transition-colors"
+                            >
+                              Delete Post
+                            </button>
+                          )}
+                          <button className="flex items-center gap-2 text-white/60 hover:text-accent transition-colors group">
+                            <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                            </svg>
+                            <span className="font-jost">Share</span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Comments Section */}
@@ -833,7 +1002,8 @@ export default function Community() {
                                         formData.append('image', file);
                                         
                                         setLoading(true);
-                                        fetch('http://localhost:3000/api/upload', {
+                                        const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+                                        fetch(`${API_BASE}/upload`, {
                                           method: 'POST',
                                           headers: isAuthenticated ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {},
                                           body: formData,
@@ -925,7 +1095,8 @@ export default function Community() {
                                           formData.append('image', file);
                                           
                                           setLoading(true);
-                                          fetch('http://localhost:3000/api/upload', {
+                                          const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+                                          fetch(`${API_BASE}/upload`, {
                                             method: 'POST',
                                             headers: isAuthenticated ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {},
                                             body: formData,
@@ -1001,8 +1172,9 @@ export default function Community() {
                         </div>
                       )}
                     </div>
-                  </article>
-                ))
+                    </article>
+                  );
+                })
               )}
             </div>
           </main>
@@ -1112,7 +1284,8 @@ export default function Community() {
                             formData.append('image', file);
                             
                             setLoading(true);
-                            fetch('http://localhost:3000/api/upload', {
+                            const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+                            fetch(`${API_BASE}/upload`, {
                               method: 'POST',
                               headers: isAuthenticated ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {},
                               body: formData,
@@ -1177,7 +1350,8 @@ export default function Community() {
                             formData.append('image', file);
                             
                             setLoading(true);
-                            fetch('http://localhost:3000/api/upload', {
+                            const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+                            fetch(`${API_BASE}/upload`, {
                               method: 'POST',
                               headers: isAuthenticated ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {},
                               body: formData,

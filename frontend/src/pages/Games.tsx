@@ -74,7 +74,8 @@ export default function Games() {
     try {
       setTopLoading(true);
       // Get enough to build 3 slides
-      const response = await fetch("/api/games/random?limit=24");
+  const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+  const response = await fetch(`${API_BASE}/games/random?limit=24`);
       if (!response.ok) throw new Error("Failed to fetch games");
       const data = await response.json();
       setTopGames(data.games || []);
@@ -91,7 +92,8 @@ export default function Games() {
     try {
       setRowLoading((m) => ({ ...m, [genre]: true }));
       const offset = append ? (rows[genre]?.length || 0) : 0;
-      const response = await fetch(`/api/games?genre=${encodeURIComponent(genre)}&limit=${ROW_PAGE_SIZE}&offset=${offset}`);
+  const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+  const response = await fetch(`${API_BASE}/games?genre=${encodeURIComponent(genre)}&limit=${ROW_PAGE_SIZE}&offset=${offset}`);
       if (!response.ok) throw new Error(`Failed to fetch ${genre} games`);
       const data = await response.json();
       const incoming: Game[] = data.games || [];
@@ -124,7 +126,8 @@ export default function Games() {
     if (!query.trim()) return;
     try {
       setTopLoading(true);
-      const response = await fetch(`/api/games/search?q=${encodeURIComponent(query)}&limit=30`);
+  const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+  const response = await fetch(`${API_BASE}/games/search?q=${encodeURIComponent(query)}&limit=30`);
       if (!response.ok) throw new Error("Failed to search games");
       const data = await response.json();
       setTopGames(data.games || []);

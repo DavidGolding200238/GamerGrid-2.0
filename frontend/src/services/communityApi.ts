@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+import { apiUrl } from '../config/api';
 
 export interface Community {
   id: number;
@@ -70,7 +70,7 @@ const getAuthHeaders = (): Record<string, string> => {
 export const communityApi = {
   // Get all communities (with auth for user flags)
   async getCommunities(): Promise<Community[]> {
-    const response = await fetch(`${API_BASE_URL}/communities`, {
+    const response = await fetch(apiUrl('/communities'), {
       headers: getAuthHeaders(),
     });
     if (!response.ok) {
@@ -89,7 +89,7 @@ export const communityApi = {
     const token = localStorage.getItem('accessToken');
     if (!token) throw new Error('User is not authenticated');
 
-    const response = await fetch(`${API_BASE_URL}/communities`, {
+    const response = await fetch(apiUrl('/communities'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -106,7 +106,7 @@ export const communityApi = {
 
   // Get community detail (with auth for user flags)
   async getCommunity(id: number): Promise<Community> {
-    const response = await fetch(`${API_BASE_URL}/communities/${id}`, {
+    const response = await fetch(apiUrl(`/communities/${id}`), {
       headers: getAuthHeaders(),
     });
     if (!response.ok) {
@@ -126,8 +126,9 @@ export const communityApi = {
     console.log('joinCommunity - token from localStorage:', token);
     if (!token) throw new Error('User is not authenticated');
 
-    console.log('joinCommunity - sending request to:', `${API_BASE_URL}/communities/${id}/join`);
-    const response = await fetch(`${API_BASE_URL}/communities/${id}/join`, {
+    const url = apiUrl(`/communities/${id}/join`);
+    console.log('joinCommunity - sending request to:', url);
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -147,7 +148,8 @@ export const communityApi = {
     const token = localStorage.getItem('accessToken');
     if (!token) throw new Error('User is not authenticated');
 
-    const response = await fetch(`${API_BASE_URL}/communities/${id}/join`, {
+    const url = apiUrl(`/communities/${id}/join`);
+    const response = await fetch(url, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -162,7 +164,7 @@ export const communityApi = {
 
   // Get posts for a community (with auth for is_liked)
   async getCommunityPosts(communityId: number): Promise<Post[]> {
-    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts`, {
+    const response = await fetch(apiUrl(`/communities/${communityId}/posts`), {
       headers: getAuthHeaders(),
     });
     if (!response.ok) {
@@ -182,8 +184,9 @@ export const communityApi = {
     console.log('createPost - token from localStorage:', token);
     if (!token) throw new Error('User is not authenticated');
 
-    console.log('createPost - sending request to:', `${API_BASE_URL}/communities/${communityId}/posts`);
-    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts`, {
+    const url = apiUrl(`/communities/${communityId}/posts`);
+    console.log('createPost - sending request to:', url);
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -200,14 +203,35 @@ export const communityApi = {
     return response.json();
   },
 
+  // Delete a post (auth required, admin or owner)
+  async deletePost(communityId: number, postId: number): Promise<{ message: string }> {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('User is not authenticated');
+
+    const response = await fetch(apiUrl(`/communities/${communityId}/posts/${postId}`), {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to delete post');
+    }
+
+    return response.json();
+  },
+
   // Like a post (auth required)
-  async likePost(postId: number): Promise<{ message: string }> {
+  async likePost(communityId: number, postId: number): Promise<{ message: string }> {
     const token = localStorage.getItem('accessToken');
     console.log('likePost - token from localStorage:', token);
     if (!token) throw new Error('User is not authenticated');
 
-    console.log('likePost - sending request to:', `${API_BASE_URL}/posts/${postId}/like`);
-    const response = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
+    const url = apiUrl(`/communities/${communityId}/posts/${postId}/like`);
+    console.log('likePost - sending request to:', url);
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -223,11 +247,12 @@ export const communityApi = {
   },
 
   // Unlike a post (auth required)
-  async unlikePost(postId: number): Promise<{ message: string }> {
+  async unlikePost(communityId: number, postId: number): Promise<{ message: string }> {
     const token = localStorage.getItem('accessToken');
     if (!token) throw new Error('User is not authenticated');
 
-    const response = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
+    const url = apiUrl(`/communities/${communityId}/posts/${postId}/like`);
+    const response = await fetch(url, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -242,9 +267,12 @@ export const communityApi = {
 
   // Get comments for a post
   async getPostComments(communityId: number, postId: number, limit: number = 5, offset: number = 0): Promise<{ comments: Comment[], hasMore: boolean }> {
-    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts/${postId}/comments?limit=${limit}&offset=${offset}`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await fetch(
+      apiUrl(`/communities/${communityId}/posts/${postId}/comments?limit=${limit}&offset=${offset}`),
+      {
+        headers: getAuthHeaders(),
+      }
+    );
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || 'Failed to fetch comments');
@@ -261,7 +289,7 @@ export const communityApi = {
     const token = localStorage.getItem('accessToken');
     if (!token) throw new Error('User is not authenticated');
 
-    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts/${postId}/comments`, {
+    const response = await fetch(apiUrl(`/communities/${communityId}/posts/${postId}/comments`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -281,7 +309,7 @@ export const communityApi = {
     const token = localStorage.getItem('accessToken');
     if (!token) throw new Error('User is not authenticated');
 
-    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts/${postId}/comments/${commentId}/like`, {
+    const response = await fetch(apiUrl(`/communities/${communityId}/posts/${postId}/comments/${commentId}/like`), {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -299,7 +327,7 @@ export const communityApi = {
     const token = localStorage.getItem('accessToken');
     if (!token) throw new Error('User is not authenticated');
 
-    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts/${postId}/comments/${commentId}/like`, {
+    const response = await fetch(apiUrl(`/communities/${communityId}/posts/${postId}/comments/${commentId}/like`), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -317,7 +345,7 @@ export const communityApi = {
     const token = localStorage.getItem('accessToken');
     if (!token) throw new Error('User is not authenticated');
 
-    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/posts/${postId}/comments/${commentId}`, {
+    const response = await fetch(apiUrl(`/communities/${communityId}/posts/${postId}/comments/${commentId}`), {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`,

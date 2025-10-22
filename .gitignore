@@ -24,6 +24,9 @@ dist-ssr
 *.sw?
 
 .config/
+.github/
+coverage/
+tests/
 
 # Environment variables
 .env

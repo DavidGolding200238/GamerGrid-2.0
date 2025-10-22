@@ -31,7 +31,9 @@ class NewsApiService {
 
       async fetchGamingNews(limit: number = 12, page: number = 1) {
         try {
-            const response = await fetch(`/api/news/gaming?pageSize=${limit}&page=${page}`);
+                // Use centralized API base
+                const { API_BASE } = await import('../config/api');
+                const response = await fetch(`${API_BASE}/news/gaming?pageSize=${limit}&page=${page}`);
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);

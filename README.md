@@ -115,3 +115,31 @@ PORT=3000
 NODE_ENV=development
 ```
 
+## Backend Deployment (Elastic Beanstalk)
+
+1. Install dependencies and build the backend:
+   ```bash
+   cd backend
+   npm ci
+   npm run build
+   ```
+2. Verify the bundle layout:
+   ```bash
+   npm run bundle:check
+   ```
+3. Create the deployment archive:
+   ```bash
+   npm run bundle:zip
+   ```
+   The ZIP is written to `backend/deploy/backend-eb-YYYYMMDDHHMM.zip` and contains only:
+   ```
+   Procfile
+   package.json
+   package-lock.json
+   dist/
+   ```
+4. Upload the generated ZIP to Elastic Beanstalk. At launch the server logs a line similar to:
+   ```
+   [DB] connecting { host: '...', user: process.env.DB_USER, db: process.env.DB_NAME }
+   ```
+   If the username does not match your EB environment variable, update the EB configuration before redeploying.

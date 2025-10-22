@@ -3,27 +3,49 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import path from "path";
+import fs from "fs/promises";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getRandomGames, getTopGames, getGamesByGenre } from "./routes/games.js";
 import { registerUser, loginUser, getUserProfile, logoutUser, forgotPassword, resetPassword, verifyEmail } from "./routes/auth.js";
 import { authenticateToken } from "./middleware/auth.js";
-import fs from "fs/promises";
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import gamesRouter from "./routes/games.js";
+import newsRouter from "./routes/news.js";
+import communitiesRouter from "./routes/communities.js";
+import { initializeDatabase, testConnection } from "./config/database.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export function createServer() {
   const app = express();
+  const isProduction = process.env.NODE_ENV === "production" || Boolean(process.env.AWS_EXECUTION_ENV);
 
   // Middleware
-  app.use(cors());
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  const allowed = [
+    "http://gamegrid.co.za.s3-website-us-east-1.amazonaws.com",
+    "https://gamegrid.co.za",
+    "https://www.gamegrid.co.za",
+    "http://gamegrid.co.za",
+    "http://www.gamegrid.co.za",
+  ];
+
+  app.use(
+    cors({
+      origin: (origin, cb) =>
+        !origin || allowed.includes(origin) ? cb(null, true) : cb(null, false),
+      credentials: true,
+    }),
+  );
+  app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
   // Serve static files from uploads directory
-  app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+  if (!isProduction) {
+    app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+  }
 
   // Root route
   app.get('/', (_req, res) => {
@@ -38,7 +60,7 @@ export function createServer() {
 
   const upload = multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
       if (file.mimetype.startsWith("image/")) return cb(null, true);
       cb(new Error("Only image files are allowed"));
@@ -54,9 +76,10 @@ export function createServer() {
     const ext = path.extname(req.file.originalname);
     const base = path.basename(req.file.originalname, ext).replace(/\s+/g, "_");
     const filename = `${base}-${Date.now()}${ext}`;
+    const relativePath = `/uploads/${filename}`;
 
     try {
-      if (process.env.NODE_ENV === 'production') {
+      if (isProduction) {
         // Upload to S3
         const key = `uploads/${filename}`;
         await s3.send(new PutObjectCommand({
@@ -67,16 +90,25 @@ export function createServer() {
         }));
         // Use S3_BASE_URL env if set, else default to AWS S3 public URL
         const s3BaseUrl = process.env.S3_BASE_URL || `https://${process.env.S3_BUCKET_NAME}.s3.amazonaws.com`;
-        return res.json({ url: `${s3BaseUrl}/${key}` });
+        return res.json({
+          path: relativePath,
+          url: relativePath,
+          // provide absolute for debugging/legacy usage
+          absoluteUrl: `${s3BaseUrl}/${key}`,
+        });
       } else {
         // Save locally
         const uploadDir = path.join(__dirname, '../uploads');
         await fs.mkdir(uploadDir, { recursive: true });
         const filepath = path.join(uploadDir, filename);
         await fs.writeFile(filepath, req.file.buffer);
-  // Resolve a safe frontend base URL for dev: either FRONTEND_BASE_URL or inferred from the request host
-  const frontendBase = process.env.FRONTEND_BASE_URL || `${req.protocol}://${req.get('host')}`;
-  return res.json({ url: `${frontendBase}/uploads/${filename}` });
+        // Resolve a safe frontend base URL for dev: either FRONTEND_BASE_URL or inferred from the request host
+        const frontendBase = process.env.FRONTEND_BASE_URL || `${req.protocol}://${req.get("host")}`;
+        return res.json({
+          path: relativePath,
+          url: relativePath,
+          absoluteUrl: `${frontendBase}${relativePath}`,
+        });
       }
     } catch (error) {
       console.error("Upload error:", error);
@@ -93,10 +125,34 @@ export function createServer() {
   app.post("/api/auth/reset-password", resetPassword);
   app.post("/api/auth/verify-email", verifyEmail);
 
-  // Games routes
-  app.get("/api/games", getGamesByGenre);
-  app.get("/api/games/random", getRandomGames);
-  app.get("/api/games/top", getTopGames);
+  // Feature routers
+  app.use("/api/games", gamesRouter);
+  app.use("/api/news", newsRouter);
+  app.use("/api/communities", communitiesRouter);
+
+  // Database utilities (primarily for internal/admin use)
+  app.post("/api/init-db", async (_req, res) => {
+    try {
+      const success = await initializeDatabase();
+      if (success) {
+        return res.json({ message: "Database initialized successfully" });
+      }
+      return res.status(500).json({ error: "Failed to initialize database" });
+    } catch (error) {
+      console.error("Database initialization error:", error);
+      return res.status(500).json({ error: "Database initialization error" });
+    }
+  });
+
+  app.get("/healthz", async (_req, res) => {
+    try {
+      const ok = await testConnection();
+      res.status(ok ? 200 : 500).send(ok ? "ok" : "db down");
+    } catch (error) {
+      console.error("Health check error:", error);
+      res.status(500).send("db down");
+    }
+  });
 
   return app;
 }

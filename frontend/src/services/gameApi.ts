@@ -1,4 +1,5 @@
 import { Game } from "../../../shared/api";
+import { apiUrl } from '../config/api';
 
 // Define types for communities and news
 interface CommunityItem { 
@@ -17,18 +18,11 @@ interface NewsItem {
   published: string;
 }
 
-// Configuration - Update these with your actual API details
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
-
 // Note: Response shapes vary between endpoints; parsing is handled inline in each method.
 
 export class GameApiService {
   private static instance: GameApiService;
-  private baseUrl: string;
-
-  private constructor() {
-    this.baseUrl = API_BASE_URL;
-  }
+  private constructor() {}
 
   public static getInstance(): GameApiService {
     if (!GameApiService.instance) {
@@ -44,7 +38,7 @@ export class GameApiService {
   async fetchRandomGames(limit: number = 10, offset: number = 0): Promise<Game[]> {
     try {
       // Call the backend API
-      const response = await fetch(`${this.baseUrl}/games/random?limit=${limit}&offset=${offset}`);
+      const response = await fetch(apiUrl(`/games/random?limit=${limit}&offset=${offset}`));
       const json = await response.json();
       // Backend sometimes returns { data: { games: [...] } } and sometimes { games: [...] }
       if (json?.data?.games && Array.isArray(json.data.games)) {
@@ -70,7 +64,7 @@ export class GameApiService {
   async fetchGamesByGenre(genre: string, limit: number = 10, offset: number = 0): Promise<Game[]> {
     try {
       // Call the backend API
-      const response = await fetch(`${this.baseUrl}/games/genre/${genre}?limit=${limit}&offset=${offset}`);
+      const response = await fetch(apiUrl(`/games/genre/${genre}?limit=${limit}&offset=${offset}`));
       const json = await response.json();
       if (json?.data?.games && Array.isArray(json.data.games)) return json.data.games as Game[];
       if (json?.games && Array.isArray(json.games)) return json.games as Game[];
@@ -90,7 +84,7 @@ export class GameApiService {
   async searchGames(query: string, limit: number = 10, offset: number = 0): Promise<Game[]> {
     try {
       // Call the backend API
-      const response = await fetch(`${this.baseUrl}/games/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`);
+      const response = await fetch(apiUrl(`/games/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`));
       const json = await response.json();
       if (json?.data?.games && Array.isArray(json.data.games)) return json.data.games as Game[];
       if (json?.games && Array.isArray(json.games)) return json.games as Game[];
@@ -125,7 +119,7 @@ export class GameApiService {
       });
 
       // Call the backend API
-      const response = await fetch(`${this.baseUrl}/games?${queryParams}`);
+      const response = await fetch(apiUrl(`/games?${queryParams}`));
       const json = await response.json();
       if (json?.data?.games && Array.isArray(json.data.games)) return json.data.games as Game[];
       if (json?.games && Array.isArray(json.games)) return json.games as Game[];

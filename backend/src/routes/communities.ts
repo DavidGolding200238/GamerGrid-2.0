@@ -1,33 +1,58 @@
 import { Router } from "express";
 import { authenticateToken, optionalAuth } from "../middleware/auth.js";
 import { db } from "../config/database.js";
+import { normalizeUploadCollection, normalizeUploadFields, toRelativeUploadPath } from "../utils/uploads.js";
 
 const router = Router();
 
+const normalizeCommunityRecord = (community: any) =>
+  normalizeUploadFields(community, ["image_url", "banner_image_url"]);
+
 // Get all communities (optional auth for user flags)
-router.get("/communities", optionalAuth, async (req, res) => {
+router.get("/", optionalAuth, async (req, res) => {
   try {
     const userId = req.userId;
-    let query = `
+    const query = `
       SELECT id, name, description, category, image_url, banner_image_url, member_count, post_count, created_at
       FROM communities
       ORDER BY created_at DESC
     `;
     const [communities] = await db.execute(query);
+    const communityRows = Array.isArray(communities) ? [...(communities as any[])] : [];
 
-    // If user is authenticated, add membership flags
-    if (userId) {
-      for (const community of communities as any[]) {
-        const [membership] = await db.execute(
-          'SELECT role FROM community_members WHERE user_id = ? AND community_id = ?',
-          [userId, community.id]
+    if (userId && communityRows.length > 0) {
+      const communityIds = communityRows.map((community) => Number(community.id));
+      const membershipMap = new Map<number, string | null>();
+
+      if (communityIds.length > 0) {
+        const placeholders = communityIds.map(() => "?").join(",");
+        const [memberships] = await db.execute(
+          `SELECT community_id, role
+             FROM community_members
+            WHERE user_id = ?
+              AND community_id IN (${placeholders})`,
+          [userId, ...communityIds]
         );
-        community.is_member = (membership as any[]).length > 0;
-        community.role = (membership as any[])[0]?.role || null;
+        for (const membership of memberships as any[]) {
+          membershipMap.set(Number(membership.community_id), membership.role ?? null);
+        }
+      }
+      for (const community of communityRows) {
+        const id = Number(community.id);
+        const role = membershipMap.get(id) ?? null;
+        community.is_member = membershipMap.has(id);
+        community.role = role;
+      }
+    } else {
+      for (const community of communityRows) {
+        community.is_member = false;
+        community.role = null;
       }
     }
 
-    res.json({ communities });
+    communityRows.forEach(normalizeCommunityRecord);
+
+    res.json({ communities: communityRows });
   } catch (error) {
     console.error('Error fetching communities:', error);
     res.status(500).json({ error: 'Failed to fetch communities' });
@@ -35,7 +60,7 @@ router.get("/communities", optionalAuth, async (req, res) => {
 });
 
 // Get single community (optional auth)
-router.get("/communities/:id", optionalAuth, async (req, res) => {
+router.get("/:id", optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.userId;
@@ -61,6 +86,8 @@ router.get("/communities/:id", optionalAuth, async (req, res) => {
       community.role = (membership as any[])[0]?.role || null;
     }
 
+    normalizeCommunityRecord(community);
+
     res.json({ community });
   } catch (error) {
     console.error('Error fetching community:', error);
@@ -69,7 +96,7 @@ router.get("/communities/:id", optionalAuth, async (req, res) => {
 });
 
 // Create community (auth required)
-router.post("/communities", authenticateToken, async (req, res) => {
+router.post("/", authenticateToken, async (req, res) => {
   try {
     const { name, description, category, image_url, banner_image_url } = req.body;
     const userId = req.userId;
@@ -81,9 +108,12 @@ router.post("/communities", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Name, description, and category are required' });
     }
 
+    const normalizedImageUrl = toRelativeUploadPath(image_url);
+    const normalizedBannerUrl = toRelativeUploadPath(banner_image_url);
+
     const [result] = await db.execute(
       'INSERT INTO communities (name, description, category, image_url, banner_image_url) VALUES (?, ?, ?, ?, ?)',
-      [name, description, category, image_url || null, banner_image_url || null]
+      [name, description, category, normalizedImageUrl || null, normalizedBannerUrl || null]
     );
     const communityId = (result as any).insertId;
 
@@ -101,7 +131,7 @@ router.post("/communities", authenticateToken, async (req, res) => {
 });
 
 // Join community (auth required)
-router.post("/communities/:id/join", authenticateToken, async (req, res) => {
+router.post("/:id/join", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.userId;
@@ -147,7 +177,7 @@ router.post("/communities/:id/join", authenticateToken, async (req, res) => {
 });
 
 // Leave community (auth required)
-router.delete("/communities/:id/join", authenticateToken, async (req, res) => {
+router.delete("/:id/join", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.userId;
@@ -176,7 +206,7 @@ router.delete("/communities/:id/join", authenticateToken, async (req, res) => {
 });
 
 // Get community posts (optional auth for like flags)
-router.get("/communities/:id/posts", optionalAuth, async (req, res) => {
+router.get("/:id/posts", optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
     // const userId = req.userId;
@@ -185,6 +215,9 @@ router.get("/communities/:id/posts", optionalAuth, async (req, res) => {
       'SELECT id, community_id, user_id, title, content, image_url, author, likes_count, comments_count, created_at FROM community_posts WHERE community_id = ? ORDER BY created_at DESC',
       [id]
     );
+
+    const postRows = Array.isArray(posts) ? [...(posts as any[])] : [];
+    normalizeUploadCollection(postRows, ["image_url"]);
 
     // Add is_liked flag if authenticated
     // if (userId) {
@@ -197,7 +230,7 @@ router.get("/communities/:id/posts", optionalAuth, async (req, res) => {
     //   }
     // }
 
-    res.json({ posts });
+    res.json({ posts: postRows });
   } catch (error) {
     console.error('Error fetching posts:', error);
     res.status(500).json({ error: 'Failed to fetch posts' });
@@ -205,7 +238,7 @@ router.get("/communities/:id/posts", optionalAuth, async (req, res) => {
 });
 
 // Create post (auth required)
-router.post("/communities/:id/posts", authenticateToken, async (req, res) => {
+router.post("/:id/posts", authenticateToken, async (req, res) => {
   console.log('🚀🚀🚀 CREATE POST ROUTE CALLED - THIS SHOULD SHOW 🚀🚀🚀');
   try {
     const { id } = req.params;
@@ -255,9 +288,11 @@ router.post("/communities/:id/posts", authenticateToken, async (req, res) => {
     console.log('Create post - user from DB:', authorName);
     console.log('Create post - authorName:', authorName);
 
+    const normalizedImageUrl = toRelativeUploadPath(image_url);
+
     const [result] = await db.execute(
       'INSERT INTO community_posts (community_id, user_id, title, content, image_url, author) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, userId, title, content, image_url || null, authorName]
+      [id, userId, title, content, normalizedImageUrl || null, authorName]
     );
 
     const postId = (result as any).insertId;
@@ -275,11 +310,108 @@ router.post("/communities/:id/posts", authenticateToken, async (req, res) => {
   }
 });
 
+// Delete post (author or admin)
+router.delete("/:id/posts/:postId", authenticateToken, async (req, res) => {
+  try {
+    const { id: communityId, postId } = req.params;
+    const userId = req.userId;
+
+    const [postRows] = await db.execute(
+      'SELECT id, community_id, user_id FROM community_posts WHERE id = ? AND community_id = ?',
+      [postId, communityId]
+    );
+
+    if ((postRows as any[]).length === 0) {
+      return res.status(404).json({ error: 'Post not found in this community' });
+    }
+
+    const post = (postRows as any[])[0];
+    const postOwnerId = post.user_id !== null ? Number(post.user_id) : null;
+    const isOwner = postOwnerId !== null && postOwnerId === Number(userId);
+
+    let isAdmin = false;
+    if (!isOwner) {
+      const [adminCheck] = await db.execute(
+        'SELECT 1 FROM community_members WHERE user_id = ? AND community_id = ? AND role = ?',
+        [userId, communityId, 'admin']
+      );
+      isAdmin = (adminCheck as any[]).length > 0;
+      if (!isAdmin) {
+        return res.status(403).json({ error: 'Only the post owner or a community admin can delete this post' });
+      }
+    }
+
+    const [commentRows] = await db.execute(
+      'SELECT id FROM community_comments WHERE post_id = ?',
+      [postId]
+    );
+    const commentIds = (commentRows as any[]).map((row: any) => Number(row.id));
+
+    if (commentIds.length > 0) {
+      const commentPlaceholders = commentIds.map(() => "?").join(",");
+      await db.execute(
+        `DELETE FROM community_comment_likes WHERE comment_id IN (${commentPlaceholders})`,
+        commentIds
+      );
+      await db.execute(
+        `DELETE FROM community_comments WHERE id IN (${commentPlaceholders})`,
+        commentIds
+      );
+    }
+
+    await db.execute('DELETE FROM post_likes WHERE post_id = ?', [postId]);
+
+    const [deleteResult] = await db.execute(
+      'DELETE FROM community_posts WHERE id = ?',
+      [postId]
+    );
+
+    if ((deleteResult as any).affectedRows === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    await db.execute(
+      'UPDATE communities SET post_count = GREATEST(post_count - 1, 0) WHERE id = ?',
+      [communityId]
+    );
+
+    res.status(200).json({ message: 'Post deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    res.status(500).json({ error: 'Failed to delete post' });
+  }
+});
+
 // Like post (auth required)
-router.post("/posts/:postId/like", authenticateToken, async (req, res) => {
+async function ensurePostInCommunity(postId: number, communityId?: number) {
+  if (!communityId) {
+    return true;
+  }
+
+  const [rows] = await db.execute(
+    'SELECT 1 FROM community_posts WHERE id = ? AND community_id = ?',
+    [postId, communityId]
+  );
+  return (rows as any[]).length > 0;
+}
+
+async function handleLikePost(req: any, res: any) {
   try {
     const { postId } = req.params;
+    const communityIdRaw = req.params.id;
+    const communityId = communityIdRaw ? Number(communityIdRaw) : undefined;
     const userId = req.userId;
+
+    if (!Number.isInteger(Number(postId))) {
+      return res.status(400).json({ error: 'Invalid post ID' });
+    }
+
+    if (communityId !== undefined) {
+      const belongs = await ensurePostInCommunity(Number(postId), communityId);
+      if (!belongs) {
+        return res.status(404).json({ error: 'Post not found in this community' });
+      }
+    }
 
     console.log('Like post - userId:', userId, 'postId:', postId);
 
@@ -312,13 +444,29 @@ router.post("/posts/:postId/like", authenticateToken, async (req, res) => {
     console.error('Error liking post:', error);
     res.status(500).json({ error: 'Failed to like post' });
   }
-});
+}
+
+router.post("/posts/:postId/like", authenticateToken, handleLikePost);
+router.post("/:id/posts/:postId/like", authenticateToken, handleLikePost);
 
 // Unlike post (auth required)
-router.delete("/posts/:postId/like", authenticateToken, async (req, res) => {
+async function handleUnlikePost(req: any, res: any) {
   try {
     const { postId } = req.params;
+    const communityIdRaw = req.params.id;
+    const communityId = communityIdRaw ? Number(communityIdRaw) : undefined;
     const userId = req.userId;
+
+    if (!Number.isInteger(Number(postId))) {
+      return res.status(400).json({ error: 'Invalid post ID' });
+    }
+
+    if (communityId !== undefined) {
+      const belongs = await ensurePostInCommunity(Number(postId), communityId);
+      if (!belongs) {
+        return res.status(404).json({ error: 'Post not found in this community' });
+      }
+    }
 
     // Remove like
     const [result] = await db.execute(
@@ -341,49 +489,101 @@ router.delete("/posts/:postId/like", authenticateToken, async (req, res) => {
     console.error('Error unliking post:', error);
     res.status(500).json({ error: 'Failed to unlike post' });
   }
-});
+}
+
+router.delete("/posts/:postId/like", authenticateToken, handleUnlikePost);
+router.delete("/:id/posts/:postId/like", authenticateToken, handleUnlikePost);
 
 // Get comments for a post
-router.get("/communities/:id/posts/:postId/comments", async (req, res) => {
-  console.log('GET comments route called for postId:', req.params.postId);
+router.get("/:id/posts/:postId/comments", optionalAuth, async (req, res) => {
   try {
-    const { postId } = req.params;
-    const limit = parseInt(req.query.limit as string) || 5;
-    const offset = parseInt(req.query.offset as string) || 0;
-    const userId = req.userId; // May be undefined if not authenticated
+    const communityId = Number.parseInt(req.params.id, 10);
+    const postId = Number.parseInt(req.params.postId, 10);
 
-    let query = `
-      SELECT id, post_id, parent_comment_id, user_id, content, image_url, author, likes_count, created_at
-      FROM community_comments 
-      WHERE post_id = ? 
-      ORDER BY created_at ASC 
-      LIMIT ? OFFSET ?
-    `;
-    let params = [postId, limit + 1, offset];
-
-    const [comments] = await db.execute(query, params);
-
-    const commentsArray = comments as any[];
-    
-    // Add is_liked field if user is authenticated
-    if (userId) {
-      for (const comment of commentsArray) {
-        const [liked] = await db.execute(
-          'SELECT id FROM community_comment_likes WHERE comment_id = ? AND user_id = ?',
-          [comment.id, userId]
-        );
-        comment.is_liked = (liked as any[]).length > 0;
-      }
-    } else {
-      // Set is_liked to false for all comments if not authenticated
-      commentsArray.forEach(comment => comment.is_liked = false);
+    if (!Number.isInteger(communityId) || !Number.isInteger(postId)) {
+      return res.status(400).json({ error: 'Invalid community or post ID' });
     }
 
-    const hasMore = commentsArray.length > limit;
-    const commentsToReturn = hasMore ? commentsArray.slice(0, limit) : commentsArray;
+    const limitParam = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
+    const offsetParam = Array.isArray(req.query.offset) ? req.query.offset[0] : req.query.offset;
 
-    console.log('Comments fetched:', commentsToReturn.length, 'hasMore:', hasMore);
-    res.json({ comments: commentsToReturn, hasMore });
+    const limitRaw = typeof limitParam === 'string' ? limitParam : undefined;
+    const offsetRaw = typeof offsetParam === 'string' ? offsetParam : undefined;
+    const parsedLimit = limitRaw !== undefined ? Number.parseInt(limitRaw, 10) : Number.NaN;
+    const parsedOffset = offsetRaw !== undefined ? Number.parseInt(offsetRaw, 10) : Number.NaN;
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 50) : 5;
+    const offset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+    const userId = req.userId;
+
+    const [postRows] = await db.execute(
+      'SELECT id FROM community_posts WHERE id = ? AND community_id = ? LIMIT 1',
+      [postId, communityId]
+    );
+    if ((postRows as any[]).length === 0) {
+      return res.status(404).json({ error: 'Post not found in community' });
+    }
+
+    const [countRows] = await db.execute(
+      'SELECT COUNT(*) AS total FROM community_comments WHERE post_id = ?',
+      [postId]
+    );
+    const total = Number((countRows as any[])[0]?.total ?? 0);
+
+    const commentsQuery = `
+        SELECT
+          pc.id,
+          pc.post_id,
+          pc.parent_comment_id,
+          pc.user_id,
+          pc.content,
+          pc.image_url,
+          pc.author,
+          pc.likes_count,
+          pc.created_at,
+          u.display_name,
+          u.username
+        FROM community_comments pc
+        LEFT JOIN users u ON u.id = pc.user_id
+        WHERE pc.post_id = ?
+        ORDER BY pc.created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+    const [comments] = await db.execute(commentsQuery, [postId]);
+
+    const commentsArray = Array.isArray(comments) ? [...(comments as any[])] : [];
+
+    for (const comment of commentsArray) {
+      if (!comment.author) {
+        comment.author = comment.display_name ?? comment.username ?? 'Anonymous';
+      }
+      comment.is_liked = false;
+      delete comment.display_name;
+      delete comment.username;
+    }
+
+    if (userId && commentsArray.length > 0) {
+      const commentIds = commentsArray.map((comment) => Number(comment.id));
+      const [likes] = await db.execute(
+        'SELECT comment_id FROM community_comment_likes WHERE user_id = ? AND comment_id IN (?)',
+        [userId, commentIds]
+      );
+      const likedIds = new Set<number>((likes as any[]).map((row) => Number(row.comment_id)));
+      for (const comment of commentsArray) {
+        comment.is_liked = likedIds.has(Number(comment.id));
+      }
+    }
+
+    normalizeUploadCollection(commentsArray, ["image_url"]);
+
+    const hasMore = offset + commentsArray.length < total;
+
+    res.json({
+      comments: commentsArray,
+      total,
+      limit,
+      offset,
+      hasMore,
+    });
   } catch (error) {
     console.error('Error fetching comments:', error);
     res.status(500).json({ error: 'Failed to fetch comments' });
@@ -391,7 +591,7 @@ router.get("/communities/:id/posts/:postId/comments", async (req, res) => {
 });
 
 // Create comment on a post (auth required)
-router.post("/communities/:id/posts/:postId/comments", authenticateToken, async (req, res) => {
+router.post("/:id/posts/:postId/comments", authenticateToken, async (req, res) => {
   console.log('POST comment route called');
   try {
     const { postId } = req.params;
@@ -418,9 +618,11 @@ router.post("/communities/:id/posts/:postId/comments", authenticateToken, async 
       authorName = 'Anonymous';
     }
 
+    const normalizedImageUrl = toRelativeUploadPath(image_url);
+
     const [result] = await db.execute(
       'INSERT INTO community_comments (post_id, parent_comment_id, user_id, content, image_url, author) VALUES (?, ?, ?, ?, ?, ?)',
-      [postId, parent_comment_id || null, userId, content, image_url || null, authorName]
+      [postId, parent_comment_id || null, userId, content, normalizedImageUrl || null, authorName]
     );
 
     const commentId = (result as any).insertId;
@@ -439,7 +641,7 @@ router.post("/communities/:id/posts/:postId/comments", authenticateToken, async 
 });
 
 // Like a comment
-router.post("/communities/:id/posts/:postId/comments/:commentId/like", authenticateToken, async (req, res) => {
+router.post("/:id/posts/:postId/comments/:commentId/like", authenticateToken, async (req, res) => {
   try {
     const { commentId } = req.params;
     const userId = req.userId;
@@ -474,7 +676,7 @@ router.post("/communities/:id/posts/:postId/comments/:commentId/like", authentic
 });
 
 // Unlike a comment
-router.delete("/communities/:id/posts/:postId/comments/:commentId/like", authenticateToken, async (req, res) => {
+router.delete("/:id/posts/:postId/comments/:commentId/like", authenticateToken, async (req, res) => {
   try {
     const { commentId } = req.params;
     const userId = req.userId;
@@ -502,46 +704,81 @@ router.delete("/communities/:id/posts/:postId/comments/:commentId/like", authent
   }
 });
 
-// Delete a comment (admin only)
-router.delete("/communities/:id/posts/:postId/comments/:commentId", authenticateToken, async (req, res) => {
+// Delete a comment (admin or comment owner)
+router.delete("/:id/posts/:postId/comments/:commentId", authenticateToken, async (req, res) => {
   try {
     const { id: communityId, commentId } = req.params;
     const userId = req.userId;
 
-    // Check if user is admin of the community
-    const [adminCheck] = await db.execute(
-      'SELECT role FROM community_members WHERE user_id = ? AND community_id = ? AND role = ?',
-      [userId, communityId, 'admin']
-    );
-
-    if ((adminCheck as any[]).length === 0) {
-      return res.status(403).json({ error: 'Only community admins can delete comments' });
-    }
-
-    // Check if comment exists and belongs to a post in this community
-    const [commentCheck] = await db.execute(
-      'SELECT c.id, p.community_id FROM community_comments c JOIN community_posts p ON c.post_id = p.id WHERE c.id = ? AND p.community_id = ?',
+    // Check if the comment exists, belongs to this community, and capture owner info
+    const [commentRows] = await db.execute(
+      `SELECT c.id, c.post_id, c.user_id, c.parent_comment_id
+         FROM community_comments c
+         JOIN community_posts p ON c.post_id = p.id
+        WHERE c.id = ? AND p.community_id = ?`,
       [commentId, communityId]
     );
 
-    if ((commentCheck as any[]).length === 0) {
+    if ((commentRows as any[]).length === 0) {
       return res.status(404).json({ error: 'Comment not found in this community' });
     }
 
-    // Delete comment likes first (due to foreign key constraint)
-    await db.execute('DELETE FROM community_comment_likes WHERE comment_id = ?', [commentId]);
+    const comment = (commentRows as any[])[0];
+    const postId = Number(comment.post_id);
+    const commentOwnerId = comment.user_id !== null ? Number(comment.user_id) : null;
+    const isOwner = commentOwnerId !== null && commentOwnerId === Number(userId);
 
-    // Delete the comment
-    const [result] = await db.execute('DELETE FROM community_comments WHERE id = ?', [commentId]);
+    let isAdmin = false;
+    if (!isOwner) {
+      const [adminCheck] = await db.execute(
+        'SELECT 1 FROM community_members WHERE user_id = ? AND community_id = ? AND role = ?',
+        [userId, communityId, 'admin']
+      );
+      isAdmin = (adminCheck as any[]).length > 0;
+      if (!isAdmin) {
+        return res.status(403).json({ error: 'Only the comment owner or a community admin can delete this comment' });
+      }
+    }
 
-    if ((result as any).affectedRows === 0) {
+    // Collect comment IDs to delete (target + any descendants)
+    const idsToDelete: number[] = [Number(commentId)];
+    const queue: number[] = [Number(commentId)];
+
+    while (queue.length > 0) {
+      const currentId = queue.pop()!;
+      const [childRows] = await db.execute(
+        'SELECT id FROM community_comments WHERE parent_comment_id = ?',
+        [currentId]
+      );
+      for (const row of childRows as any[]) {
+        const childId = Number(row.id);
+        idsToDelete.push(childId);
+        queue.push(childId);
+      }
+    }
+
+    const placeholders = idsToDelete.map(() => "?").join(",");
+
+    // Delete likes referencing any of the comments
+    await db.execute(
+      `DELETE FROM community_comment_likes WHERE comment_id IN (${placeholders})`,
+      idsToDelete
+    );
+
+    // Delete the comments themselves
+    const [deleteResult] = await db.execute(
+      `DELETE FROM community_comments WHERE id IN (${placeholders})`,
+      idsToDelete
+    );
+
+    if ((deleteResult as any).affectedRows === 0) {
       return res.status(404).json({ error: 'Comment not found' });
     }
 
     // Update comments count on the post
     await db.execute(
-      'UPDATE community_posts SET comments_count = comments_count - 1 WHERE id = (SELECT post_id FROM community_comments WHERE id = ?)',
-      [commentId]
+      'UPDATE community_posts SET comments_count = GREATEST(comments_count - ?, 0) WHERE id = ?',
+      [idsToDelete.length, postId]
     );
 
     res.status(200).json({ message: 'Comment deleted successfully' });

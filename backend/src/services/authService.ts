@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../config/database.js';
+import { toRelativeUploadPath } from '../utils/uploads.js';
 
 // TypeScript interfaces for type safety
 export interface User {
@@ -54,7 +55,7 @@ export function generateTokens(user: User): AuthTokens {
       username: user.username,
       email: user.email,
       display_name: user.display_name,
-      profile_image: user.profile_image,
+      profile_image: toRelativeUploadPath(user.profile_image) ?? undefined,
       created_at: user.created_at
     }
   };
@@ -132,7 +133,10 @@ export async function authenticateUser(usernameOrEmail: string, password: string
 
     // Return user without password hash
     const { password_hash, ...userWithoutPassword } = user;
-    return userWithoutPassword as User;
+    return {
+      ...userWithoutPassword,
+      profile_image: toRelativeUploadPath(userWithoutPassword.profile_image) ?? undefined,
+    } as User;
   } finally {
     connection.release();
   }
@@ -148,7 +152,17 @@ export async function getUserById(userId: number): Promise<User | null> {
       [userId]
     ) as any;
 
-    return users.length > 0 ? users[0] as User : null;
+    if (users.length === 0) {
+      return null;
+    }
+
+    const user = users[0] as User;
+    const normalizedProfile = toRelativeUploadPath(user.profile_image) ?? undefined;
+
+    return {
+      ...user,
+      profile_image: normalizedProfile,
+    };
   } finally {
     connection.release();
   }

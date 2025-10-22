@@ -7,14 +7,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Header } from '../components/Header';
 import { NetworkBackground } from '../components/NetworkBackground';
 import Footer from '../components/footer';
+import { imgSrc } from '../config/api';
 
 // Use reliable static fallback images
 const imageFallback = '/assets/placeholders/game-placeholder.jpg';
 const newsFallback = '/assets/placeholders/news-placeholder.jpg';
 
-// Resolve backend-relative image URLs (e.g., /uploads/xyz.jpg) to absolute URLs
-const resolveImageUrl = (url?: string) =>
-  url ? (url.startsWith('http') ? url : `${import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, '') || ''}${url}`) : '';
+// Resolve backend-relative image URLs (e.g., /uploads/xyz.jpg) to relative URLs
+const resolveImageUrl = (url?: string) => imgSrc(url) ?? '';
 
 // Local fallback games to show if the API returns nothing
 const FALLBACK_GAMES: Game[] = [

@@ -1,52 +1,63 @@
-import mysql from 'mysql2/promise';
-import dotenv from 'dotenv';
+import mysql from "mysql2/promise";
+import dotenv from "dotenv";
 
-dotenv.config();
+if (process.env.NODE_ENV !== "production") {
+  dotenv.config();
+}
 
-// MySQL database connection configuration
+const {
+  DB_HOST,
+  DB_PORT = "3306",
+  DB_NAME,
+  DB_USER,
+  DB_PASSWORD,
+} = process.env;
+
+if (!DB_HOST || !DB_NAME || !DB_USER) {
+  console.error("[DB] Missing required env vars", {
+    DB_HOST: Boolean(DB_HOST),
+    DB_NAME: Boolean(DB_NAME),
+    DB_USER: Boolean(DB_USER),
+  });
+  process.exit(1);
+}
+
+console.log("[DB] connecting", { host: DB_HOST, user: DB_USER, db: DB_NAME });
+
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'game_grid_db',
+  host: DB_HOST,
+  port: Number(DB_PORT),
+  database: DB_NAME,
+  user: DB_USER,
+  password: DB_PASSWORD,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
 };
 
-// Create MySQL connection pool for better performance
 export const pool = mysql.createPool(dbConfig);
 export const db = pool;
 
-// Test if database connection works
-export async function testConnection() {
+export async function testConnection(): Promise<boolean> {
   try {
     const connection = await pool.getConnection();
-    console.log(' Database connected successfully');
-    
-    // Test if we can actually query the database
-    const [result] = await connection.execute('SELECT DATABASE() as current_db') as any;
-    console.log('Current database:', result[0]?.current_db);
-    
-    // Test if game_grid_db exists
-    const [databases] = await connection.execute('SHOW DATABASES LIKE "game_grid_db"') as any;
-    console.log(' game_grid_db exists:', databases.length > 0);
-    
+    console.log("[DB] connection established");
+    const [result] = (await connection.execute(
+      "SELECT DATABASE() as current_db"
+    )) as any;
+    console.log("[DB] current database:", result[0]?.current_db);
     connection.release();
     return true;
   } catch (error) {
-    console.error(' Database connection failed:', error);
+    console.error("[DB] connection failed:", error);
     return false;
   }
 }
 
-// Initialize database tables
-export async function initializeDatabase() {
+export async function initializeDatabase(): Promise<boolean> {
   try {
     const connection = await pool.getConnection();
-    
-    // Create users table
+
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -64,7 +75,6 @@ export async function initializeDatabase() {
       )
     `);
 
-    // Create user_games table (for favorites, wishlist, etc.)
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS user_games (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -79,8 +89,6 @@ export async function initializeDatabase() {
       )
     `);
 
-
-       // ADD COMMUNITY TABLES
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS communities (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -110,7 +118,6 @@ export async function initializeDatabase() {
       )
     `);
 
-    // Add community membership table
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS community_members (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -124,7 +131,6 @@ export async function initializeDatabase() {
       )
     `);
 
-    // Add post likes table
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS community_comments (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -142,16 +148,6 @@ export async function initializeDatabase() {
       )
     `);
 
-    // Add missing columns if not exist
-    try {
-      await connection.execute(`ALTER TABLE community_comments ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)`);
-      await connection.execute(`ALTER TABLE community_comments ADD COLUMN IF NOT EXISTS likes_count INT DEFAULT 0`);
-      await connection.execute(`ALTER TABLE communities ADD COLUMN IF NOT EXISTS banner_image_url VARCHAR(500)`);
-    } catch (alterError) {
-      console.log('Columns may already exist or alter failed:', (alterError as Error).message);
-    }
-
-    // Add comment likes table
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS community_comment_likes (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -164,11 +160,11 @@ export async function initializeDatabase() {
       )
     `);
 
-    console.log('✅ Database tables initialized successfully');
+    console.log("[DB] schema initialized");
     connection.release();
     return true;
   } catch (error) {
-    console.error('❌ Failed to initialize database:', error);
+    console.error("[DB] Failed to initialize database:", error);
     return false;
   }
 }

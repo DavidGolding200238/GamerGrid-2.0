@@ -41,11 +41,28 @@ const createNodes = (count: number, w: number, h: number, maxSpeed: number): Net
 const useReducedMotion = () => {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      setReduced(false);
+      return;
+    }
+
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     const handler = () => setReduced(mq.matches);
     handler();
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
+
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', handler);
+    } else if (typeof mq.addListener === 'function') {
+      mq.addListener(handler);
+    }
+
+    return () => {
+      if (typeof mq.removeEventListener === 'function') {
+        mq.removeEventListener('change', handler);
+      } else if (typeof mq.removeListener === 'function') {
+        mq.removeListener(handler);
+      }
+    };
   }, []);
   return reduced;
 };
