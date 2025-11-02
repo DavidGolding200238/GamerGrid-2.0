@@ -35,3 +35,6 @@ tests/
 .env.test.local
 .env.production.local
 *.env
+
+#deploy folders
+deploy/
