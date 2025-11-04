@@ -68,17 +68,33 @@ GamerGrid 2.0 is a production-grade, full-stack web platform that curates gaming
 ## Project Structure
 
 ```
-.
-├── backend/         # Contains the Express.js backend application
+GamerGrid-2.0/
+├── frontend/              # React app (pages, components, services, hooks)
 │   ├── src/
-│   ├── package.json
-│   └── ...
-├── frontend/        # Contains the React frontend application
+│   │   ├── components/    # UI building blocks and layout pieces
+│   │   ├── pages/         # Route-level screens (Home, Games, Community, etc.)
+│   │   ├── services/      # API clients (auth, games, communities, news)
+│   │   ├── hooks/         # Shared React hooks (toast bus, breakpoints)
+│   │   ├── analytics/     # Google Analytics wiring
+│   │   └── App.tsx        # Application shell and router
+│   └── public/            # Static assets shipped with the SPA
+│
+├── backend/               # Express API
 │   ├── src/
-│   ├── package.json
-│   └── ...
-├── package.json     # Root package.json with monorepo scripts
-└── README.md
+│   │   ├── routes/        # REST endpoints (auth, games, news, communities)
+│   │   ├── middleware/    # JWT verification and helpers
+│   │   ├── services/      # Auth utilities, email, RAWG integration
+│   │   ├── config/        # MySQL pool and schema bootstrap
+│   │   └── server.ts      # Runtime entry point
+│   └── scripts/           # Elastic Beanstalk packaging/check scripts
+│
+├── shared/                # TypeScript contracts shared by both halves
+│   └── api.ts             # Game and pagination interfaces
+│
+├── deploy/                # Generated deployment bundles (ignored in Git)
+└── uploads/               # Local-only upload storage for development
+
+
 ```
 
 ---
