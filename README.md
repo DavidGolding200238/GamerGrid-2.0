@@ -1,5 +1,3 @@
-Here’s a GitHub-ready README.md you can drop into the repo:
-
 # GamerGrid 2.0
 
 GamerGrid 2.0 is a production-grade, full-stack web platform that curates gaming content, community engagement, and real-time news. It pairs a React/Vite frontend with an Express/TypeScript backend, backed by MySQL and AWS services, and is deployable to Elastic Beanstalk.
@@ -14,7 +12,7 @@ GamerGrid 2.0 is a production-grade, full-stack web platform that curates gaming
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [Development Scripts](#development-scripts)
+- [Development Scripts](#development-scripts)
 - [Environment Variables](#environment-variables)
 - [Backend API](#backend-api)
 - [Deployment](#deployment)
@@ -42,63 +40,46 @@ GamerGrid 2.0 is a production-grade, full-stack web platform that curates gaming
 ## Tech Stack
 
 ### Frontend
-- **Framework**: React 18 + TypeScript
-- **Routing**: React Router 6
-- **Styling**: TailwindCSS 3, Radix UI components, custom canvas animations
-- **State/Data**: TanStack Query, localStorage persistence
-- **Build Tool**: Vite with SWC-based React transform
+
+- **Framework**: React 18 + TypeScript  
+- **Routing**: React Router 6  
+- **Styling**: TailwindCSS 3, Radix UI components, custom canvas animations  
+- **State/Data**: TanStack Query, `localStorage` persistence  
+- **Build Tool**: Vite with SWC-based React transform  
 
 ### Backend
-- **Runtime**: Node.js 20 with Express 4 (ES modules)
-- **Language**: TypeScript compiled via `tsc`
-- **Database**: MySQL (mysql2/promise pool)
-- **Storage**: AWS S3 (production) or filesystem (development)
-- **Email**: Nodemailer (Gmail SMTP by default)
-- **External APIs**: RAWG (games), NewsAPI (news)
+
+- **Runtime**: Node.js 20 with Express 4 (ES modules)  
+- **Language**: TypeScript compiled via `tsc`  
+- **Database**: MySQL (`mysql2/promise` pool)  
+- **Storage**: AWS S3 (production) or filesystem (development)  
+- **Email**: Nodemailer (Gmail SMTP by default)  
+- **External APIs**: RAWG (games), NewsAPI (news)  
 
 ### Tooling
-- Vitest for unit tests
-- Prettier for formatting
-- TailwindCSS Animate plugin
-- Concurrently for multi-app dev workflow
+
+- Vitest for unit tests  
+- Prettier for formatting  
+- TailwindCSS Animate plugin  
+- `concurrently` for multi-app dev workflow   
 
 ---
 
 ## Project Structure
 
-GamerGrid-2.0/
-├── frontend/ # React application
-│ ├── src/
-│ │ ├── components/ # Header, footer, cards, UI primitives, background effects
-│ │ ├── pages/ # Index, Home, Games, Community, News, Dashboard, Auth, 404
-│ │ ├── services/ # API clients (auth, games, communities, news)
-│ │ ├── analytics/ # Google Analytics setup
-│ │ ├── hooks/ # Shared hooks (toast bus, breakpoint helpers)
-│ │ └── App.tsx # Application shell, routing, providers
-│ ├── public/ # Static assets
-│ ├── package.json # Frontend scripts and dependencies
-│ ├── vite.config.ts # Vite dev/build configuration
-│ └── tsconfig.json # TypeScript compiler settings
-│
-├── backend/ # Express REST API
-│ ├── src/
-│ │ ├── routes/ # Auth, games, news, communities endpoints
-│ │ ├── middleware/ # JWT authentication guards
-│ │ ├── services/ # Auth utilities, email, RAWG helpers
-│ │ ├── config/ # MySQL connection and schema bootstrap
-│ │ ├── utils/ # Upload helpers
-│ │ └── server.ts # Runtime entry point
-│ ├── scripts/ # EB bundle validation and ZIP creation
-│ ├── package.json # Backend scripts and dependencies
-│ └── tsconfig.json # Backend TypeScript configuration
-│
-├── shared/ # Cross-layer TypeScript interfaces
-│ └── api.ts # Game and list response types
-│
-├── deploy/ # Generated deployment bundles
-├── uploads/ # Local-only uploaded assets (gitignored)
-└── package.json # Workspace scripts orchestrating both apps
-
+```
+.
+├── backend/         # Contains the Express.js backend application
+│   ├── src/
+│   ├── package.json
+│   └── ...
+├── frontend/        # Contains the React frontend application
+│   ├── src/
+│   ├── package.json
+│   └── ...
+├── package.json     # Root package.json with monorepo scripts
+└── README.md
+```
 
 ---
 
@@ -106,145 +87,133 @@ GamerGrid-2.0/
 
 ### Prerequisites
 
-- Node.js 20+
-- npm 9+
-- MySQL instance (local or hosted)
-- API keys for RAWG and NewsAPI
-- Email credentials (Gmail SMTP or equivalent)
-- AWS account with S3 access (for production file uploads)
+-   [Node.js](https://nodejs.org/en/download/) (Version 20.x or later)
+-   [npm](https://www.npmjs.com/get-npm)
+-   A running [MySQL](https://dev.mysql.com/downloads/mysql/) database instance.
 
 ### Installation
 
-1. **Install dependencies**
+1.  **Clone the repository:**
+    ```sh
+    git clone https://github.com/DavidGolding200238/GamerGrid-2.0.git
+    cd GamerGrid-2.0
+    ```
 
-   ```bash
+2.  **Install all dependencies:**
+    This command installs dependencies for the root, `frontend`, and `backend` projects.
+    ```sh
     npm run install:all
-Configure environment variables
+    ```
 
-Create .env files in backend/ and frontend/ (details below).
+---
 
-Run development servers
+## Development Scripts
 
-npm run dev
-Frontend served via Vite on port 5173
-Backend served via Express on port 3000
-Vite proxies /api requests to Express automatically
-Build and run production artifacts
+The following scripts are available in the root `package.json` to manage the monorepo workflow.
 
-npm run build
-npm start           # Runs compiled backend (frontend build outputs to frontend/dist)
-Development Scripts
-npm run dev             # Concurrent frontend + backend dev servers
-npm run dev:frontend    # Frontend only
-npm run dev:backend     # Backend only
-npm run build           # Build both apps
-npm run start           # Start compiled backend
-npm run typecheck       # TypeScript checks
-npm run typecheck:frontend
-npm run typecheck:backend
-npm run test            # Vitest suite
-npm run format.fix      # Prettier formatting
-Environment Variables
-Backend (backend/.env)
+-   **`npm run dev`**: Starts both the frontend and backend development servers concurrently.
+-   **`npm run build`**: Builds both frontend and backend applications for production.
+-   **`npm start`**: Starts the production backend server (requires a prior build).
+-   **`npm run test`**: Runs unit tests with Vitest.
+-   **`npm run format.fix`**: Formats the entire codebase with Prettier.
+-   **`npm run typecheck`**: Performs TypeScript type-checking across both `frontend` and `backend`.
+
+---
+
+## Environment Variables
+
+Create a `.env` file in the `backend` directory to configure the server, database, and external service credentials.
+
+```env
+# backend/.env
+
+# Server
 PORT=3000
-NODE_ENV=development
 
+# Database
 DB_HOST=localhost
-DB_PORT=3306
-DB_USER=your_user
-DB_PASSWORD=your_password
-DB_NAME=game_grid_db
+DB_USER=your_db_user
+DB_PASSWORD=your_db_password
+DB_NAME=gamergrid
 
-JWT_SECRET=your_long_random_secret
-JWT_EXPIRES_IN=7d
+# Security
+JWT_SECRET=your_super_secret_jwt_key
+CORS_ORIGIN=http://localhost:5173 # Or your frontend URL
 
+# AWS (for S3 and other services)
+AWS_REGION=your_aws_region
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+S3_BUCKET_NAME=your_s3_bucket_name
+
+# External APIs
 RAWG_API_KEY=your_rawg_api_key
-NEWS_API_KEY=your_newsapi_key
+NEWS_API_KEY=your_news_api_key
 
-EMAIL_USER=your_email_username
-EMAIL_PASS=your_email_password
-FRONTEND_BASE_URL=http://localhost:5173
+# Email (Nodemailer)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_app_password
+```
 
-S3_BUCKET_NAME=your_bucket
-AWS_REGION=us-east-1
-S3_BASE_URL=https://your_bucket.s3.amazonaws.com
-Frontend (frontend/.env)
-VITE_API_BASE=/api
-VITE_GA_ID=G-XXXXXXXXXX
-VITE_RAWG_API_BASE=https://api.rawg.io/api   # optional override
-Use environment managers or secrets stores per environment; avoid committing real secrets.
+---
 
-Backend API
-Key routes exposed by Express:
+## Backend API
 
-GET /api/ping — Service heartbeat
-GET /healthz — Database connectivity check
-POST /api/upload — Image uploads (switches between local filesystem and S3)
-POST /api/auth/register / login / logout / forgot-password / reset-password / verify-email
-GET /api/auth/profile — Returns current user (JWT required)
-GET /api/games — Paginated game list with optional filters/ordering
-GET /api/games/search — RAWG search proxy
-GET /api/games/random, /top, /genre/:genre
-GET /api/news/gaming — NewsAPI proxy
-/api/communities — Community directory, join/leave, create
-/api/communities/:id/posts — Posts CRUD and like/unlike
-/api/communities/:id/posts/:postId/comments — Threaded comments CRUD and like/unlike
-Refer to backend/src/routes for complete implementations and response shapes.
+The backend exposes a RESTful API for all platform operations. Key endpoint categories include:
+- `auth/` for user registration, login, and password management.
+- `users/` for profile data.
+- `communities/` for creating and managing communities.
+- `posts/` and `comments/` for content management.
+- `games/` for interacting with the RAWG API proxy.
+- `news/` for fetching articles from the NewsAPI proxy.
 
-Deployment
-Elastic Beanstalk (Backend)
-Build the backend artifact:
+---
 
-cd backend
-npm ci
-npm run build
-Validate bundle contents:
+## Deployment
 
-npm run bundle:check
-Create deployment ZIP:
+### Elastic Beanstalk (Backend)
 
-npm run bundle:zip
-Outputs backend/deploy/backend-eb-YYYYMMDD-HHmmss-local.zip containing:
+The backend is configured for deployment to AWS Elastic Beanstalk. The `.ebextensions` folder (if present) and `scripts/` contain helpers for bundling the application into a `.zip` file that follows the required layout for a Node.js environment on Amazon Linux.
 
-Procfile
-package.json
-package-lock.json
-dist/
-.platform/ (optional nginx config)
-Deploy to Elastic Beanstalk:
+- **`npm run build:backend`**: Compiles the TypeScript code.
+- **`npm run bundle:zip`**: (From `backend` directory) Creates a `gamergrid-backend.zip` file ready for upload to Elastic Beanstalk.
 
-Upload the ZIP via EB console or CLI.
-Configure EB environment variables to match backend/.env.
-On startup logs should include:
-[DB] connecting { host: '...', user: ..., db: ... }
-[DB] schema initialized
-Backend listening on http://0.0.0.0:PORT
-Verify /healthz returns ok and the frontend can reach the API.
+### Static Hosting (Frontend)
 
-Static Hosting (Frontend)
-Build the frontend:
+The frontend is a static single-page application (SPA) that can be deployed to any static hosting provider like Vercel, Netlify, or AWS S3/CloudFront.
 
-cd frontend
-npm run build
-Deploy frontend/dist/ to your host of choice (S3/CloudFront, Netlify, Vercel, etc.).
+- **`npm run build:frontend`**: Creates a production-ready build in the `frontend/dist` directory.
 
-Ensure VITE_API_BASE points to the deployed API URL before building, or configure rewrites/proxies accordingly.
+---
 
-Testing & Quality
-Unit Tests: Vitest coverage exists for shared utilities; expand to cover API clients and components.
-Integration Tests: Recommended for auth and community flows (Supertest, Playwright, Cypress).
-Static Analysis: TypeScript strictness on both tiers; consider adding ESLint/Prettier hooks.
-CI/CD: Integrate scripts into a pipeline to run typecheck, test, and bundle:check before deployment.
-Security Considerations
-Rotate all API keys, JWT secrets, and SMTP passwords regularly.
-Use IAM roles or scoped credentials for S3 access.
-Avoid exposing API keys in the browser (consider proxying RAWG/NewsAPI fully through the backend).
-Enforce HTTPS and tighten CORS allowlists for production domains.
-Store session tokens securely (HTTP-only cookies are recommended for production hardening).
-Roadmap Ideas
-Add end-to-end tests covering sign-in, community interactions, and uploads.
-Introduce WebSocket/SSE updates for live community activity.
-Enhance dashboard with personalized data harvested from user profile/activity.
-Integrate role-based admin tooling for community moderation.
-Add localization, theming, and accessibility audits.
-Automate deployments with GitHub Actions and infrastructure-as-code.
+## Testing & Quality
+
+- **Type Safety**: Full TypeScript coverage in both frontend and backend to prevent common runtime errors.
+- **Unit Tests**: `vitest` is used for running unit tests. Test files are located alongside their source files.
+- **Linting & Formatting**: `prettier` enforces a consistent code style across the project.
+
+---
+
+## Security Considerations
+
+- **Authentication**: JWTs are used to secure endpoints. Sensitive routes are protected with middleware that verifies token validity.
+- **Password Security**: Passwords are never stored in plaintext. They are hashed using `bcrypt` before being saved to the database.
+- **CORS**: The backend enforces a strict Cross-Origin Resource Sharing (CORS) policy to only allow requests from the designated frontend URL.
+- **Environment Variables**: All sensitive keys, secrets, and configuration values are loaded from a `.env` file, which should never be committed to source control.
+
+---
+
+## Roadmap Ideas
+
+- **Real-Time Chat**: Integrate WebSockets for live chat within communities.
+- **Friend System**: Allow users to add and manage friends.
+- **Game Library**: Let users track the games they are playing, have completed, or wish to play.
+- **CI/CD Pipeline**: Automate testing and deployment using GitHub Actions.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
