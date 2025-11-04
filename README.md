@@ -161,14 +161,19 @@ EMAIL_PASS=your_app_password
 
 ## Backend API
 
-The backend exposes a RESTful API for all platform operations. Key endpoint categories include:
-- `auth/` for user registration, login, and password management.
-- `users/` for profile data.
-- `communities/` for creating and managing communities.
-- `posts/` and `comments/` for content management.
-- `games/` for interacting with the RAWG API proxy.
-- `news/` for fetching articles from the NewsAPI proxy.
+The backend provides the core business logic for GamerGrid and acts as a secure proxy for third-party services. API keys for external services are managed on the backend and are never exposed to the client.
 
+### Core API (Internal)
+This functionality is handled entirely by your own backend.
+-   **`auth/`**: Manages user registration, JWT-based login, and password management.
+-   **`users/`**: Handles user profile data.
+-   **`communities/`**, **`posts/`**, **`comments/`**: Powers all community features, including content creation, moderation, and interactions.
+-   **`uploads/`**: Manages media uploads to the local filesystem (dev) or AWS S3 (prod).
+
+### Proxied APIs (External)
+These endpoints forward requests to third-party APIs, abstracting away the direct interaction and securing API keys.
+-   **`games/`**: Proxies requests to the **RAWG Video Games Database API** to power the game catalog, search, and details. This is implemented in `backend/src/routes/games.ts`.
+-   **`news/`**: Proxies requests to the **NewsAPI** to deliver the gaming news feed. This is implemented in `backend/src/routes/news.ts`.
 ---
 
 ## Deployment
