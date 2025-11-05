@@ -136,6 +136,7 @@ The following scripts are available in the root `package.json` to manage the mon
 
 ---
 
+
 ## Environment Variables
 
 Create a `.env` file in the `backend` directory to configure the server, database, and external service credentials.
@@ -232,6 +233,25 @@ The frontend is a static single-page application (SPA) that can be deployed to a
 - **Friend System**: Allow users to add and manage friends.
 - **Game Library**: Let users track the games they are playing, have completed, or wish to play.
 - **CI/CD Pipeline**: Automate testing and deployment using GitHub Actions.
+
+- ## Wireframes 
+
+### Dashboards
+
+![Home wireframe](./wireframes/Dashboard.png)
+
+### Games
+
+![Game wireframe](./wireframes/Gamepage.png)
+
+### Detailed Game View
+
+![Detailed wireframe](./wireframes/DetailedGamepage.png)
+
+###Review View
+
+![Detailed wireframe](./wireframes/gamereviews.png)
+
 
 ---
 
