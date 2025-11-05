@@ -239,35 +239,24 @@ router.get("/:id/posts", optionalAuth, async (req, res) => {
 
 // Create post (auth required)
 router.post("/:id/posts", authenticateToken, async (req, res) => {
-  console.log('🚀🚀🚀 CREATE POST ROUTE CALLED - THIS SHOULD SHOW 🚀🚀🚀');
+  console.log(' CREATE POST ROUTE CALLED - THIS SHOULD SHOW ');
   try {
     const { id } = req.params;
     const { title, content, image_url } = req.body;
     const userId = req.userId;
 
-    console.log('🔥 USER ID:', userId, 'COMMUNITY ID:', id);
+    console.log(' USER ID:', userId, 'COMMUNITY ID:', id);
     console.log('Create post - req.user:', req.user);
 
     if (!userId) {
-      console.log('❌ NO USER ID - AUTH FAILED');
+      console.log(' NO USER ID - AUTH FAILED');
       return res.status(401).json({ error: 'Authentication failed' });
     }
 
     if (!title || !content) {
       return res.status(400).json({ error: 'Title and content are required' });
     }
-
-    // Check if user is member
-    // const [membership] = await db.execute(
-    //   'SELECT role FROM community_members WHERE user_id = ? AND community_id = ?',
-    //   [userId, id]
-    // );
-
-    // if ((membership as any[]).length === 0) {
-    //   return res.status(403).json({ error: 'Must be a member to post' });
-    // }
-
-    // Get user info for author name
+   
     console.log('About to query user with userId:', userId);
     let authorName = 'Anonymous';
     try {
