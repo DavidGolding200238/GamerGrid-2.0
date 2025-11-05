@@ -254,7 +254,7 @@ The frontend is a static single-page application (SPA) that can be deployed to a
 
 ## Walkthrough Video
 
-[▶ Watch the walkthrough on Google Drive]([https://drive.google.com/file/d/XXXXXXXXXXXX/view?usp=sharing](https://drive.google.com/file/d/1wZ4mRzEXMk3KVm6ih0xGMPkQ1lZ8wKRz/view?usp=sharing))
+[▶ Watch the walkthrough on Google Drive](https://drive.google.com/file/d/1wZ4mRzEXMk3KVm6ih0xGMPkQ1lZ8wKRz/view?usp=sharing)
 
 
 
