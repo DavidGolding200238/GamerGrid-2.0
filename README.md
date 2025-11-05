@@ -226,6 +226,13 @@ The frontend is a static single-page application (SPA) that can be deployed to a
 - **Environment Variables**: All sensitive keys, secrets, and configuration values are loaded from a `.env` file, which should never be committed to source control.
 
 ---
+## Entity Relationship Diagram
+![ERD Diagram](./ERD/erd.png)
+
+
+## Documentation
+You can view the detailed architecture here:
+[Architecture Overview (PDF)](./proposaldocument/ProjectProposal_TheGameGrid200238.pdf)
 
 ## Roadmap Ideas
 
