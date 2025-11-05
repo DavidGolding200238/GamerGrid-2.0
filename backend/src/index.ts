@@ -68,9 +68,10 @@ export function createServer() {
   });
 
   // S3 client
+  //
   const s3 = new S3Client({ region: process.env.AWS_REGION });
 
-  // Upload endpoint (uploads to S3 in production, local in dev)
+  // Upload endpoint (uploads to S3 in production, local in dev)   
   app.post("/api/upload", upload.single("image"), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const ext = path.extname(req.file.originalname);
