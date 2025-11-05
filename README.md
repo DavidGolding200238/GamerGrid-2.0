@@ -227,7 +227,7 @@ The frontend is a static single-page application (SPA) that can be deployed to a
 
 ---
 ## Entity Relationship Diagram
-![ERD Diagram](./ERD/erd.png)
+![ERD Diagram](./ERD/erd.jpg)
 
 
 ## Documentation
